@@ -195,17 +195,32 @@ app.get('/api/categories', (req, res) => {
   })));
 });
 
+// Batch helper: fetch in groups of BATCH_SIZE with delay between batches
+async function fetchInBatches(entries, batchSize = 10, delayMs = 1500) {
+  const results = [];
+  for (let i = 0; i < entries.length; i += batchSize) {
+    const batch = entries.slice(i, i + batchSize);
+    const batchResults = await Promise.allSettled(
+      batch.map(([id, keyword]) =>
+        spApiGet(`/catalog/2022-04-01/items?keywords=${encodeURIComponent(keyword)}&marketplaceIds=${MARKETPLACE_ID}&includedData=summaries,attributes,salesRanks,images`)
+          .then(r => ({ id, data: r.data }))
+      )
+    );
+    results.push(...batchResults);
+    if (i + batchSize < entries.length) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+    console.log(`Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(entries.length / batchSize)} done (${Math.min(i + batchSize, entries.length)}/${entries.length})`);
+  }
+  return results;
+}
+
 app.get('/api/trends', async (req, res) => {
   const categories = CATEGORY_KEYWORDS;
   try {
     const results = {};
     const entries = Object.entries(categories);
-    const fetches = await Promise.allSettled(
-      entries.map(([id, keyword]) =>
-        spApiGet(`/catalog/2022-04-01/items?keywords=${encodeURIComponent(keyword)}&marketplaceIds=${MARKETPLACE_ID}&includedData=summaries,attributes,salesRanks,images`)
-          .then(r => ({ id, data: r.data }))
-      )
-    );
+    const fetches = await fetchInBatches(entries, 10, 1500);
     for (const result of fetches) {
       if (result.status === 'fulfilled') {
         const { id, data } = result.value;
