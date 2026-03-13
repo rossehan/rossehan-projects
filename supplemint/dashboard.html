@@ -591,18 +591,30 @@ function SuppleMint() {
                           onMouseEnter={e => e.currentTarget.style.background = i < 3 ? `rgba(${i === 0 ? "251,191,36" : i === 1 ? "192,192,192" : "205,127,50"},0.12)` : "rgba(255,255,255,0.05)"}
                           onMouseLeave={e => e.currentTarget.style.background = i < 3 ? `rgba(${i === 0 ? "251,191,36" : i === 1 ? "192,192,192" : "205,127,50"},0.06)` : "transparent"}>
                             <div style={{
-                              width: 28, height: 28, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: 13, fontWeight: 700,
+                              width: 32, height: 32, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: 13, fontWeight: 700, flexShrink: 0,
                               background: i === 0 ? "rgba(251,191,36,0.2)" : i === 1 ? "rgba(192,192,192,0.2)" : i === 2 ? "rgba(205,127,50,0.2)" : "rgba(255,255,255,0.05)",
                               color: i === 0 ? "#fbbf24" : i === 1 ? "#c0c0c0" : i === 2 ? "#cd7f32" : "#64748b"
                             }}>{i + 1}</div>
+                            {p.image && (
+                              <div style={{ width: 52, height: 52, borderRadius: 8, overflow: "hidden", background: "#1e293b", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <img src={p.image} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                              </div>
+                            )}
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 13, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title}</div>
                               <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{p.brand} &middot; {cat?.icon} {cat?.name}</div>
                             </div>
-                            <div style={{ textAlign: "right", flexShrink: 0 }}>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: "#6ee7b7" }}>#{p.rank.toLocaleString()}</div>
-                              {p.price && <div style={{ fontSize: 11, color: "#94a3b8" }}>${p.price.toFixed(2)}</div>}
+                            <div style={{ textAlign: "right", flexShrink: 0, display: "flex", alignItems: "center", gap: 12 }}>
+                              <div>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: "#6ee7b7" }}>#{p.rank.toLocaleString()}</div>
+                                {p.price && <div style={{ fontSize: 11, color: "#94a3b8" }}>${p.price.toFixed(2)}</div>}
+                              </div>
+                              <a href={`https://www.amazon.com/dp/${p.asin}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+                                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32, borderRadius: 8, background: "rgba(255,153,0,0.15)", color: "#ff9900", textDecoration: "none", fontSize: 14, flexShrink: 0 }}
+                                title="View on Amazon">
+                                {"\u2197"}
+                              </a>
                             </div>
                           </div>
                         );
