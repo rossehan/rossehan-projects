@@ -75,6 +75,21 @@ async function getAccessToken() {
   throw new Error('Token error: ' + JSON.stringify(res.data));
 }
 
+function extractPrice(attrs) {
+  const lp = attrs?.list_price?.[0];
+  if (lp) {
+    if (typeof lp.value === 'number') return lp.value;
+    if (typeof lp.value === 'string') return parseFloat(lp.value);
+    if (lp.value?.amount) return parseFloat(lp.value.amount);
+  }
+  const p = attrs?.price?.[0];
+  if (p) {
+    if (typeof p.value === 'number') return p.value;
+    if (typeof p.value === 'string') return parseFloat(p.value);
+  }
+  return null;
+}
+
 async function spApiGet(path) {
   const token = await getAccessToken();
   return httpsGet('sellingpartnerapi-na.amazon.com', path, {
@@ -138,17 +153,12 @@ app.get('/api/trends', async (req, res) => {
       if (result.status === 'fulfilled') {
         const { id, data } = result.value;
         const items = data.items || [];
-        const prices = items.map(p => {
-          const attrs = p.attributes;
-          const price = attrs?.list_price?.[0]?.value?.amount || attrs?.price?.[0]?.value;
-          return price ? parseFloat(price) : null;
-        }).filter(Boolean);
+        const prices = items.map(p => extractPrice(p.attributes)).filter(Boolean);
         const ranks = items.map(p => p.salesRanks?.[0]?.ranks?.[0]?.rank).filter(Boolean);
         const brands = {};
         items.forEach(p => {
           const brand = p.attributes?.brand?.[0]?.value || 'Unknown';
-          const pr = p.attributes?.list_price?.[0]?.value?.amount || p.attributes?.price?.[0]?.value;
-          const priceVal = pr ? parseFloat(pr) : 0;
+          const priceVal = extractPrice(p.attributes) || 0;
           if (!brands[brand]) brands[brand] = { count: 0, revenue: 0 };
           brands[brand].count += 1;
           brands[brand].revenue += priceVal;
@@ -166,7 +176,7 @@ app.get('/api/trends', async (req, res) => {
               asin: p.asin,
               title: p.summaries?.[0]?.itemName || 'Unknown',
               brand: p.attributes?.brand?.[0]?.value || 'Unknown',
-              price: (() => { const pr = p.attributes?.list_price?.[0]?.value?.amount || p.attributes?.price?.[0]?.value; return pr ? parseFloat(pr) : null; })(),
+              price: extractPrice(p.attributes),
               rank: p.salesRanks?.[0]?.ranks?.[0]?.rank || null,
               image: p.images?.[0]?.images?.[0]?.link || null
             }))

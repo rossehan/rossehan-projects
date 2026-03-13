@@ -248,7 +248,8 @@ function SuppleMint() {
   };
 
   const formatPrice = (attrs) => {
-    const price = attrs?.list_price?.[0]?.value?.amount || attrs?.price?.[0]?.value;
+    const lp = attrs?.list_price?.[0];
+    const price = (typeof lp?.value === 'number' ? lp.value : lp?.value?.amount) || attrs?.price?.[0]?.value;
     return price ? `$${parseFloat(price).toFixed(2)}` : "N/A";
   };
   const getBrand = (attrs) => attrs?.brand?.[0]?.value || "Unknown Brand";
@@ -610,7 +611,7 @@ function SuppleMint() {
                             summaries: [{ itemName: p.title }],
                             attributes: {
                               brand: [{ value: p.brand }],
-                              ...(p.price ? { list_price: [{ value: { amount: String(p.price) } }] } : {}),
+                              ...(p.price ? { list_price: [{ value: p.price }] } : {}),
                             },
                             salesRanks: p.rank ? [{ ranks: [{ rank: p.rank }] }] : [],
                             images: p.image ? [{ images: [{ link: p.image }] }] : [],
