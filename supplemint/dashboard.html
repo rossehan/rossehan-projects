@@ -573,11 +573,23 @@ function SuppleMint() {
                       {topAll.map((p, i) => {
                         const cat = CATEGORIES.find(ct => ct.id === p.category);
                         return (
-                          <div key={p.asin} style={{
+                          <div key={p.asin} onClick={() => setSelectedProduct({
+                            asin: p.asin,
+                            summaries: [{ itemName: p.title }],
+                            attributes: {
+                              brand: [{ value: p.brand }],
+                              ...(p.price ? { list_price: [{ value: { amount: String(p.price) } }] } : {}),
+                            },
+                            salesRanks: p.rank ? [{ ranks: [{ rank: p.rank }] }] : [],
+                            images: p.image ? [{ images: [{ link: p.image }] }] : [],
+                          })} style={{
                             display: "flex", alignItems: "center", gap: 14, padding: "12px 16px",
                             background: i < 3 ? `rgba(${i === 0 ? "251,191,36" : i === 1 ? "192,192,192" : "205,127,50"},0.06)` : "transparent",
-                            border: "1px solid rgba(255,255,255,0.05)", borderRadius: 10
-                          }}>
+                            border: "1px solid rgba(255,255,255,0.05)", borderRadius: 10,
+                            cursor: "pointer", transition: "all 0.2s",
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = i < 3 ? `rgba(${i === 0 ? "251,191,36" : i === 1 ? "192,192,192" : "205,127,50"},0.12)` : "rgba(255,255,255,0.05)"}
+                          onMouseLeave={e => e.currentTarget.style.background = i < 3 ? `rgba(${i === 0 ? "251,191,36" : i === 1 ? "192,192,192" : "205,127,50"},0.06)` : "transparent"}>
                             <div style={{
                               width: 28, height: 28, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
                               fontSize: 13, fontWeight: 700,
