@@ -211,21 +211,18 @@ app.get('/api/debug', async (req, res) => {
   try {
     const result = await spApiGet(`/catalog/2022-04-01/items?keywords=vitamin+supplements&marketplaceIds=${MARKETPLACE_ID}&includedData=summaries,attributes,salesRanks,images`);
     const items = result.data?.items || [];
-    const priceDebug = items.slice(0, 3).map(p => {
-      const attrs = p.attributes || {};
-      return {
-        asin: p.asin,
-        title: p.summaries?.[0]?.itemName,
-        list_price_raw: attrs.list_price || 'NOT_FOUND',
-        list_price_0: attrs.list_price?.[0] || 'NOT_FOUND',
-        list_price_0_value: attrs.list_price?.[0]?.value,
-        list_price_0_value_type: typeof attrs.list_price?.[0]?.value,
-        extractedPrice: extractPrice(attrs),
-        allPriceKeys: Object.keys(attrs).filter(k => k.toLowerCase().includes('price')),
-        allKeys: Object.keys(attrs),
-      };
-    });
-    res.json({ totalItems: items.length, priceDebug });
+    const itemDebug = items.slice(0, 2).map(p => ({
+      asin: p.asin,
+      title: p.summaries?.[0]?.itemName,
+      extractedPrice: extractPrice(p.attributes),
+      list_price_raw: p.attributes?.list_price || 'NOT_FOUND',
+      salesRanks_raw: p.salesRanks || 'NOT_FOUND',
+      salesRanks_0_ranks_0: p.salesRanks?.[0]?.ranks?.[0] || 'NOT_FOUND',
+      extractedRank: p.salesRanks?.[0]?.ranks?.[0]?.rank || null,
+      image: p.images?.[0]?.images?.[0]?.link || 'NOT_FOUND',
+      topLevelKeys: Object.keys(p),
+    }));
+    res.json({ totalItems: items.length, itemDebug });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
