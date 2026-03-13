@@ -4,9 +4,15 @@ const cors = require('cors');
 const https = require('https');
 const querystring = require('querystring');
 
+const path = require('path');
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.static(path.join(__dirname)));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dashboard.html'));
+});
 
 const CLIENT_ID = process.env.SP_API_CLIENT_ID;
 const CLIENT_SECRET = process.env.SP_API_CLIENT_SECRET;
