@@ -75,6 +75,14 @@ async function getAccessToken() {
   throw new Error('Token error: ' + JSON.stringify(res.data));
 }
 
+function extractRank(salesRanks) {
+  const sr = salesRanks?.[0];
+  if (!sr) return null;
+  // Try classificationRanks first (category-specific), then displayGroupRanks (overall)
+  const rank = sr.classificationRanks?.[0]?.rank || sr.displayGroupRanks?.[0]?.rank || sr.ranks?.[0]?.rank;
+  return rank || null;
+}
+
 function extractPrice(attrs) {
   const lp = attrs?.list_price?.[0];
   if (lp) {
@@ -155,7 +163,7 @@ app.get('/api/trends', async (req, res) => {
         const items = data.items || [];
         const prices = items.map(p => extractPrice(p.attributes)).filter(Boolean);
         console.log(`[${id}] items: ${items.length}, prices found: ${prices.length}, sample: ${prices.slice(0,3)}`);
-        const ranks = items.map(p => p.salesRanks?.[0]?.ranks?.[0]?.rank).filter(Boolean);
+        const ranks = items.map(p => extractRank(p.salesRanks)).filter(Boolean);
         const brands = {};
         items.forEach(p => {
           const brand = p.attributes?.brand?.[0]?.value || 'Unknown';
@@ -178,7 +186,7 @@ app.get('/api/trends', async (req, res) => {
               title: p.summaries?.[0]?.itemName || 'Unknown',
               brand: p.attributes?.brand?.[0]?.value || 'Unknown',
               price: extractPrice(p.attributes),
-              rank: p.salesRanks?.[0]?.ranks?.[0]?.rank || null,
+              rank: extractRank(p.salesRanks),
               image: p.images?.[0]?.images?.[0]?.link || null
             }))
             .filter(p => p.rank)
@@ -217,8 +225,7 @@ app.get('/api/debug', async (req, res) => {
       extractedPrice: extractPrice(p.attributes),
       list_price_raw: p.attributes?.list_price || 'NOT_FOUND',
       salesRanks_raw: p.salesRanks || 'NOT_FOUND',
-      salesRanks_0_ranks_0: p.salesRanks?.[0]?.ranks?.[0] || 'NOT_FOUND',
-      extractedRank: p.salesRanks?.[0]?.ranks?.[0]?.rank || null,
+      extractedRank: extractRank(p.salesRanks),
       image: p.images?.[0]?.images?.[0]?.link || 'NOT_FOUND',
       topLevelKeys: Object.keys(p),
     }));

@@ -254,7 +254,10 @@ function SuppleMint() {
   };
   const getBrand = (attrs) => attrs?.brand?.[0]?.value || "Unknown Brand";
   const getTitle = (summaries) => summaries?.[0]?.itemName || "Unknown Product";
-  const getRank = (salesRanks) => salesRanks?.[0]?.ranks?.[0]?.rank || null;
+  const getRank = (salesRanks) => {
+    const sr = salesRanks?.[0];
+    return sr?.classificationRanks?.[0]?.rank || sr?.displayGroupRanks?.[0]?.rank || sr?.ranks?.[0]?.rank || null;
+  };
   const getImage = (images) => images?.[0]?.images?.[0]?.link || null;
 
   const ProductCard = ({ product, onClick }) => {
