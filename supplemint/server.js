@@ -154,6 +154,7 @@ app.get('/api/trends', async (req, res) => {
         const { id, data } = result.value;
         const items = data.items || [];
         const prices = items.map(p => extractPrice(p.attributes)).filter(Boolean);
+        console.log(`[${id}] items: ${items.length}, prices found: ${prices.length}, sample: ${prices.slice(0,3)}`);
         const ranks = items.map(p => p.salesRanks?.[0]?.ranks?.[0]?.rank).filter(Boolean);
         const brands = {};
         items.forEach(p => {
