@@ -273,17 +273,41 @@ const TREND_HASHTAGS = [
 function CategoryLoadingSpinner() {
   const [idx, setIdx] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setIdx(i => (i + 1) % CATEGORIES.length), 800);
+    const t = setInterval(() => setIdx(i => (i + 1) % CATEGORIES.length), 600);
     return () => clearInterval(t);
   }, []);
-  const cat = CATEGORIES[idx];
+  const ICON_SIZE = 56;
+  const centerOffset = 3 * ICON_SIZE;
   return (
-    <div style={{ textAlign: "center", padding: 80 }}>
-      <div style={{ fontSize: 52, marginBottom: 10, transition: "all 0.3s ease" }}>{cat.icon}</div>
-      <div style={{ fontSize: 15, fontWeight: 600, color: "#0f172a", marginBottom: 14, transition: "all 0.3s ease" }}>{cat.name}</div>
-      <div style={{ width: 40, height: 40, border: "3px solid rgba(16,185,129,0.2)", borderTopColor: "#10b981", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
-      <div style={{ color: "#64748b" }}>Analyzing all categories from Amazon SP-API...</div>
-      <div style={{ color: "#94a3b8", fontSize: 12, marginTop: 8 }}>{idx + 1} / {CATEGORIES.length} categories</div>
+    <div style={{ textAlign: "center", padding: 60 }}>
+      <div style={{ overflow: "hidden", marginBottom: 20, position: "relative", height: 80, maxWidth: 500, margin: "0 auto 20px" }}>
+        <div style={{
+          display: "flex", alignItems: "center",
+          transition: "transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+          transform: `translateX(${-idx * ICON_SIZE + centerOffset}px)`,
+          width: "max-content",
+        }}>
+          {CATEGORIES.map((cat, i) => {
+            const dist = Math.abs(i - idx);
+            return (
+              <div key={cat.id} style={{
+                fontSize: dist === 0 ? 48 : dist === 1 ? 32 : 24,
+                opacity: dist === 0 ? 1 : dist === 1 ? 0.6 : dist === 2 ? 0.3 : 0.15,
+                transition: "all 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+                width: ICON_SIZE, textAlign: "center", flexShrink: 0,
+                transform: dist === 0 ? "scale(1.1)" : "scale(1)",
+              }}>{cat.icon}</div>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginBottom: 12, minHeight: 24 }}>{CATEGORIES[idx]?.name}</div>
+      <div style={{ width: 36, height: 36, border: "3px solid rgba(16,185,129,0.2)", borderTopColor: "#10b981", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 12px" }} />
+      <div style={{ color: "#64748b", fontSize: 14 }}>Analyzing all categories from Amazon SP-API...</div>
+      <div style={{ color: "#94a3b8", fontSize: 12, marginTop: 6 }}>{idx + 1} / {CATEGORIES.length} categories</div>
+      <div style={{ width: 240, height: 4, background: "#f1f5f9", borderRadius: 2, margin: "14px auto 0", overflow: "hidden" }}>
+        <div style={{ width: `${((idx + 1) / CATEGORIES.length) * 100}%`, height: "100%", background: "linear-gradient(90deg, #10b981, #3b82f6)", borderRadius: 2, transition: "width 0.5s ease" }} />
+      </div>
     </div>
   );
 }
@@ -304,6 +328,8 @@ function SuppleMint() {
   const [keywordFilter, setKeywordFilter] = useState("");
   const [top100CatFilters, setTop100CatFilters] = useState([]);
   const [top100CatSearch, setTop100CatSearch] = useState("");
+  const [catDetailProducts, setCatDetailProducts] = useState([]);
+  const [catDetailLoading, setCatDetailLoading] = useState(false);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/health`)
@@ -330,6 +356,34 @@ function SuppleMint() {
     if (activeTab === "dashboard" && !trends) loadTrends();
     if (activeTab === "browse") loadCategory(activeCategory);
   }, [activeTab, activeCategory]);
+
+  // Fetch category detail products when single category selected in Top 100 filter
+  useEffect(() => {
+    if (top100CatFilters.length === 1) {
+      const catId = top100CatFilters[0];
+      setCatDetailLoading(true);
+      setCatDetailProducts([]);
+      fetch(`${API_BASE}/api/products/${catId}`)
+        .then(r => r.json())
+        .then(data => {
+          const items = (data.items || []).map(p => ({
+            asin: p.asin,
+            title: p.summaries?.[0]?.itemName || 'Unknown',
+            brand: p.attributes?.brand?.[0]?.value || 'Unknown',
+            price: (() => { const lp = p.attributes?.list_price?.[0]; const pr = (typeof lp?.value === 'number' ? lp.value : lp?.value?.amount) || p.attributes?.price?.[0]?.value; return pr ? parseFloat(pr) : null; })(),
+            rank: (() => { const sr = p.salesRanks?.[0]; return sr?.classificationRanks?.[0]?.rank || sr?.displayGroupRanks?.[0]?.rank || sr?.ranks?.[0]?.rank || null; })(),
+            image: p.images?.[0]?.images?.[0]?.link || null,
+            category: catId,
+          })).filter(p => p.rank).sort((a, b) => a.rank - b.rank).slice(0, 100);
+          setCatDetailProducts(items);
+        })
+        .catch(() => setCatDetailProducts([]))
+        .finally(() => setCatDetailLoading(false));
+    } else {
+      setCatDetailProducts([]);
+      setCatDetailLoading(false);
+    }
+  }, [top100CatFilters]);
 
   const loadTrends = async () => {
     setTrendsLoading(true);
@@ -839,6 +893,7 @@ function SuppleMint() {
                   {/* Top 100 Products */}
                   {(() => {
                     const filteredTop = top100CatFilters.length === 0 ? topAll
+                      : (top100CatFilters.length === 1 && catDetailProducts.length > 0) ? catDetailProducts
                       : catEntries
                           .filter(([catId]) => top100CatFilters.includes(catId))
                           .flatMap(([catId, c]) => (c.topProducts || []).map(p => ({ ...p, category: catId })))
@@ -857,7 +912,8 @@ function SuppleMint() {
                     </div>
                     <div style={{ maxHeight: 600, overflowY: "auto", borderRadius: 10, paddingRight: 4 }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                        {filteredTop.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#94a3b8" }}>No products in this category</div>}
+                        {catDetailLoading && <div style={{ textAlign: "center", padding: 40 }}><div style={{ width: 32, height: 32, border: "3px solid rgba(16,185,129,0.2)", borderTopColor: "#10b981", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 12px" }} /><div style={{ color: "#64748b", fontSize: 13 }}>Loading category products...</div></div>}
+                        {!catDetailLoading && filteredTop.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#94a3b8" }}>No products in this category</div>}
                         {filteredTop.map((p, i) => {
                           const cat = CATEGORIES.find(ct => ct.id === p.category);
                           return (
