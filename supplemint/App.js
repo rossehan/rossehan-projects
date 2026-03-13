@@ -35,7 +35,7 @@ const getTitle = (summaries) => summaries?.[0]?.itemName || "Unknown Product";
 const getRank = (salesRanks) => salesRanks?.[0]?.ranks?.[0]?.rank || null;
 const getImage = (images) => images?.[0]?.images?.[0]?.link || null;
 
-export default function SuppleMint() {
+export default function VitaView() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [activeCategory, setActiveCategory] = useState("vitamins");
   const [products, setProducts] = useState([]);
@@ -246,7 +246,7 @@ export default function SuppleMint() {
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 36, height: 36, background: "linear-gradient(135deg, #6ee7b7, #3b82f6)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🌿</div>
           <div>
-            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 18, fontWeight: 700, color: "#fff", letterSpacing: -0.5 }}>SuppleMint</div>
+            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 18, fontWeight: 700, color: "#fff", letterSpacing: -0.5 }}>VitaView</div>
             <div style={{ fontSize: 11, color: "#475569", letterSpacing: 2, textTransform: "uppercase" }}>Amazon Market Intelligence</div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 ﻿{
-  "name": "supplemint-backend",
+  "name": "vitaview-backend",
   "version": "1.0.0",
-  "description": "SuppleMint Amazon SP-API Backend",
+  "description": "VitaView Amazon SP-API Backend",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

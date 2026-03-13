@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: supplemint
+    name: vitaview
     runtime: node
     rootDir: supplemint
     buildCommand: npm install

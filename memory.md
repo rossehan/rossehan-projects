@@ -1,4 +1,4 @@
-# SuppleMint - Project Memory
+# VitaView - Project Memory
 
 ## SP-API Configuration
 - Credentials stored in local .env file (NOT in git)

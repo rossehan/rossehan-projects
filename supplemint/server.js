@@ -334,10 +334,84 @@ app.get('/api/debug', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Pre-fetch trends data function (reused by startup and API)
+async function fetchTrendsData() {
+  const entries = Object.entries(CATEGORY_KEYWORDS);
+  const results = {};
+  const fetches = await fetchInBatches(entries, 15, 800);
+  for (const result of fetches) {
+    if (result.status === 'fulfilled') {
+      const { id, data } = result.value;
+      const items = data.items || [];
+      const prices = items.map(p => extractPrice(p.attributes)).filter(Boolean);
+      const ranks = items.map(p => extractRank(p.salesRanks)).filter(Boolean);
+      const brands = {};
+      items.forEach(p => {
+        const brand = p.attributes?.brand?.[0]?.value || 'Unknown';
+        const priceVal = extractPrice(p.attributes) || 0;
+        const rank = extractRank(p.salesRanks);
+        const dailySales = estimateDailySales(rank);
+        const monthlyRevenue = priceVal * dailySales * 30;
+        if (!brands[brand]) brands[brand] = { count: 0, revenue: 0 };
+        brands[brand].count += 1;
+        brands[brand].revenue += monthlyRevenue;
+      });
+      const totalCatRevenue = Object.values(brands).reduce((sum, b) => sum + b.revenue, 0);
+      const dailySalesArr = ranks.map(r => estimateDailySales(r));
+      const avgDailySales = dailySalesArr.length ? Math.round(dailySalesArr.reduce((a, b) => a + b, 0) / dailySalesArr.length) : 0;
+      const brandCount = Object.keys(brands).length;
+      const totalBrandProducts = Object.values(brands).reduce((sum, b) => sum + b.count, 0);
+      const hhi = totalBrandProducts > 0 ? Math.round(Object.values(brands).reduce((sum, b) => {
+        const share = (b.count / totalBrandProducts) * 100;
+        return sum + share * share;
+      }, 0)) : 0;
+      const topBrandEntry = Object.entries(brands).sort((a, b) => b[1].revenue - a[1].revenue)[0];
+      const topBrandShare = topBrandEntry && totalCatRevenue > 0 ? Math.round((topBrandEntry[1].revenue / totalCatRevenue) * 100) : 0;
+      results[id] = {
+        totalProducts: data.numberOfResults || items.length,
+        itemCount: items.length,
+        avgPrice: prices.length ? +(prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2) : 0,
+        minPrice: prices.length ? Math.min(...prices) : 0,
+        maxPrice: prices.length ? Math.max(...prices) : 0,
+        avgRank: ranks.length ? Math.round(ranks.reduce((a, b) => a + b, 0) / ranks.length) : 0,
+        estimatedMonthlyRevenue: Math.round(totalCatRevenue),
+        avgDailySales, brandCount, hhi,
+        topBrand: topBrandEntry ? topBrandEntry[0] : 'N/A',
+        topBrandShare,
+        priceSpread: prices.length ? +(Math.max(...prices) - Math.min(...prices)).toFixed(2) : 0,
+        brands,
+        topProducts: items.map(p => ({
+          asin: p.asin, title: p.summaries?.[0]?.itemName || 'Unknown',
+          brand: p.attributes?.brand?.[0]?.value || 'Unknown',
+          price: extractPrice(p.attributes), rank: extractRank(p.salesRanks),
+          image: p.images?.[0]?.images?.[0]?.link || null
+        })).filter(p => p.rank).sort((a, b) => a.rank - b.rank).slice(0, 100),
+        priceDistribution: {
+          under10: prices.filter(p => p < 10).length,
+          '10to20': prices.filter(p => p >= 10 && p < 20).length,
+          '20to30': prices.filter(p => p >= 20 && p < 30).length,
+          '30to50': prices.filter(p => p >= 30 && p < 50).length,
+          over50: prices.filter(p => p >= 50).length,
+        }
+      };
+    }
+  }
+  return { categories: results, timestamp: new Date().toISOString() };
+}
+
 app.listen(PORT, () => {
   console.log(`🚀 VitaView Backend running on http://localhost:${PORT}`);
   console.log(`📋 Mode: LIVE (SP-API direct HTTP)`);
   getAccessToken()
-    .then(() => console.log('✅ SP-API connected!'))
+    .then(() => {
+      console.log('✅ SP-API connected!');
+      console.log('📊 Pre-fetching trends data...');
+      return fetchTrendsData();
+    })
+    .then(data => {
+      trendsCache = data;
+      trendsCacheTime = Date.now();
+      console.log('✅ Trends data pre-cached! First load will be instant.');
+    })
     .catch(e => console.log('⚠️ SP-API:', e.message));
 });
