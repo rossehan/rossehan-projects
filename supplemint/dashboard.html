@@ -284,7 +284,7 @@ function SuppleMint() {
   const [trendsLoading, setTrendsLoading] = useState(false);
   const [expandedCompetition, setExpandedCompetition] = useState(null);
   const [keywordFilter, setKeywordFilter] = useState("");
-  const [top100CatFilter, setTop100CatFilter] = useState("all");
+  const [top100CatFilters, setTop100CatFilters] = useState([]);
   const [top100CatSearch, setTop100CatSearch] = useState("");
 
   useEffect(() => {
@@ -606,13 +606,7 @@ function SuppleMint() {
               <p style={{ color: "#64748b" }}>Amazon US Dietary Supplement Market Intelligence</p>
             </div>
 
-            {/* Keyword Filter */}
-            <div style={{ marginBottom: 24, display: "flex", gap: 12 }}>
-              <input value={keywordFilter} onChange={e => setKeywordFilter(e.target.value)}
-                placeholder="Filter by keyword... (e.g. Peptide, Gummy, Magnesium)"
-                style={{ flex: 1, maxWidth: 400, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "10px 16px", color: "#1e293b", fontSize: 13, outline: "none" }} />
-              {keywordFilter && <button onClick={() => setKeywordFilter("")} style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 12, color: "#64748b" }}>Clear</button>}
-            </div>
+            {/* Keyword Filter removed - now integrated into Top 100 category filter */}
 
             {trendsLoading && !trends ? (
               <div style={{ textAlign: "center", padding: 80 }}>
@@ -789,47 +783,56 @@ function SuppleMint() {
                     <p style={{ fontSize: 12, color: "#64748b" }}>Category products, avg price, brand market share at a glance</p>
                   </div>
 
-                  {/* Category Filter for Top 100 */}
+                  {/* Category Filter for Top 100 - Checkbox Style */}
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px", marginBottom: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
                       <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", whiteSpace: "nowrap" }}>Category Filter</span>
                       <input value={top100CatSearch} onChange={e => setTop100CatSearch(e.target.value)}
                         placeholder="Search category..."
                         style={{ flex: 1, maxWidth: 220, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 12px", fontSize: 12, color: "#1e293b", outline: "none" }} />
-                      {top100CatFilter !== "all" && (
-                        <button onClick={() => { setTop100CatFilter("all"); setTop100CatSearch(""); }} style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 8, padding: "5px 12px", cursor: "pointer", fontSize: 11, color: "#64748b", fontWeight: 600 }}>Reset</button>
+                      {top100CatFilters.length > 0 && (
+                        <span style={{ fontSize: 11, color: "#059669", fontWeight: 600 }}>{top100CatFilters.length} selected</span>
+                      )}
+                      {top100CatFilters.length > 0 && (
+                        <button onClick={() => { setTop100CatFilters([]); setTop100CatSearch(""); }} style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 8, padding: "5px 12px", cursor: "pointer", fontSize: 11, color: "#64748b", fontWeight: 600 }}>Reset</button>
                       )}
                     </div>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxHeight: 80, overflowY: "auto" }}>
-                      <button onClick={() => setTop100CatFilter("all")} style={{
-                        background: top100CatFilter === "all" ? "#ecfdf5" : "#fff",
-                        border: `1px solid ${top100CatFilter === "all" ? "#a7f3d0" : "#e2e8f0"}`,
-                        borderRadius: 16, padding: "4px 12px", cursor: "pointer", fontSize: 11, fontWeight: 600,
-                        color: top100CatFilter === "all" ? "#059669" : "#64748b"
-                      }}>All</button>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxHeight: 120, overflowY: "auto" }}>
                       {CATEGORIES
                         .filter(cat => !top100CatSearch || cat.name.toLowerCase().includes(top100CatSearch.toLowerCase()))
                         .filter(cat => catEntries.some(([id]) => id === cat.id))
-                        .map(cat => (
-                        <button key={cat.id} onClick={() => setTop100CatFilter(cat.id)} style={{
-                          background: top100CatFilter === cat.id ? "#ecfdf5" : "#fff",
-                          border: `1px solid ${top100CatFilter === cat.id ? "#a7f3d0" : "#e2e8f0"}`,
-                          borderRadius: 16, padding: "4px 10px", cursor: "pointer", fontSize: 11, fontWeight: 600,
-                          color: top100CatFilter === cat.id ? "#059669" : "#64748b"
-                        }}>{cat.icon} {cat.name}</button>
-                      ))}
+                        .map(cat => {
+                          const isChecked = top100CatFilters.includes(cat.id);
+                          return (
+                            <label key={cat.id} onClick={() => {
+                              setTop100CatFilters(prev => isChecked ? prev.filter(id => id !== cat.id) : [...prev, cat.id]);
+                            }} style={{
+                              display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", cursor: "pointer", fontSize: 11, fontWeight: 600, borderRadius: 16, userSelect: "none",
+                              background: isChecked ? "#ecfdf5" : "#fff",
+                              border: `1px solid ${isChecked ? "#a7f3d0" : "#e2e8f0"}`,
+                              color: isChecked ? "#059669" : "#64748b"
+                            }}>
+                              <span style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${isChecked ? "#10b981" : "#cbd5e1"}`, background: isChecked ? "#10b981" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                {isChecked && <span style={{ color: "#fff", fontSize: 10, lineHeight: 1 }}>{"\u2713"}</span>}
+                              </span>
+                              {cat.icon} {cat.name}
+                            </label>
+                          );
+                        })}
                     </div>
                   </div>
 
                   {/* Top 100 Products */}
                   {(() => {
-                    const filteredTop = top100CatFilter === "all" ? topAll : topAll.filter(p => p.category === top100CatFilter);
-                    const selectedCat = CATEGORIES.find(c => c.id === top100CatFilter);
+                    const filteredTop = top100CatFilters.length === 0 ? topAll : topAll.filter(p => top100CatFilters.includes(p.category));
+                    const filterLabel = top100CatFilters.length === 0 ? "Top 100 Products by Sales Rank"
+                      : top100CatFilters.length === 1 ? (() => { const sc = CATEGORIES.find(c => c.id === top100CatFilters[0]); return `${sc?.icon} ${sc?.name} - Top Products`; })()
+                      : `${top100CatFilters.length} Categories Selected - Top Products`;
                     return (
                   <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 24, marginBottom: 36, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                       <h3 style={{ fontSize: 17, fontWeight: 700, color: "#0f172a" }}>
-                        {top100CatFilter === "all" ? "Top 100 Products by Sales Rank" : `${selectedCat?.icon} ${selectedCat?.name} - Top Products`}
+                        {filterLabel}
                       </h3>
                       <span style={{ fontSize: 12, color: "#64748b" }}>{filteredTop.length} products</span>
                     </div>
