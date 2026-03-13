@@ -33,6 +33,8 @@ export default function SuppleMint() {
   const [apiStatus, setApiStatus] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [stats, setStats] = useState({ total: 0, brands: 0, avgRank: 0 });
+  const [trends, setTrends] = useState(null);
+  const [trendsLoading, setTrendsLoading] = useState(false);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/health`)
@@ -44,6 +46,22 @@ export default function SuppleMint() {
   useEffect(() => {
     if (activeTab === "browse") loadCategory(activeCategory);
   }, [activeCategory, activeTab]);
+
+  useEffect(() => {
+    if (activeTab === "dashboard" && !trends) loadTrends();
+  }, [activeTab]);
+
+  const loadTrends = async () => {
+    setTrendsLoading(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/trends`);
+      const data = await r.json();
+      setTrends(data);
+    } catch (e) {
+      console.error(e);
+    }
+    setTrendsLoading(false);
+  };
 
   const loadCategory = async (cat) => {
     setLoading(true);
@@ -240,41 +258,222 @@ export default function SuppleMint() {
         {/* DASHBOARD TAB */}
         {activeTab === "dashboard" && (
           <div>
-            <h1 style={{ fontSize: 28, fontWeight: 700, color: "#f1f5f9", marginBottom: 8 }}>Market Overview</h1>
-            <p style={{ color: "#64748b", marginBottom: 32 }}>Amazon US Dietary Supplement Intelligence</p>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
+              <div>
+                <h1 style={{ fontSize: 28, fontWeight: 700, color: "#f1f5f9", marginBottom: 8 }}>Trend Analysis Dashboard</h1>
+                <p style={{ color: "#64748b" }}>Amazon US Dietary Supplement Market Intelligence</p>
+              </div>
+              <button onClick={loadTrends} disabled={trendsLoading} style={{
+                background: "linear-gradient(135deg, #6ee7b7, #3b82f6)", border: "none", borderRadius: 10,
+                padding: "10px 20px", color: "#000", fontWeight: 700, cursor: "pointer", fontSize: 13,
+                opacity: trendsLoading ? 0.5 : 1
+              }}>{trendsLoading ? "Loading..." : "Refresh Data"}</button>
+            </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 40 }}>
-              {[
-                { label: "API Status", value: apiStatus?.mode === "live" ? "Live" : "Demo", color: "#6ee7b7", icon: "🔗" },
-                { label: "Marketplace", value: "Amazon US", color: "#818cf8", icon: "🇺🇸" },
-                { label: "Categories", value: "8", color: "#fbbf24", icon: "📂" },
-                { label: "Data Source", value: "SP-API", color: "#f472b6", icon: "⚡" },
-              ].map((s, i) => (
-                <div key={i} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 20 }}>
-                  <div style={{ fontSize: 24, marginBottom: 8 }}>{s.icon}</div>
-                  <div style={{ fontSize: 22, fontWeight: 700, color: s.color }}>{s.value}</div>
-                  <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>{s.label}</div>
+            {trendsLoading && !trends ? (
+              <div style={{ textAlign: "center", padding: 80 }}>
+                <div style={{ width: 40, height: 40, border: "3px solid rgba(110,231,183,0.2)", borderTopColor: "#6ee7b7", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
+                <div style={{ color: "#64748b" }}>Analyzing all categories from Amazon SP-API...</div>
+              </div>
+            ) : trends ? (() => {
+              const cats = trends.categories || {};
+              const catEntries = Object.entries(cats);
+              const totalProducts = catEntries.reduce((sum, [, c]) => sum + c.totalProducts, 0);
+              const allBrands = new Set();
+              catEntries.forEach(([, c]) => Object.keys(c.brands).forEach(b => allBrands.add(b)));
+              const overallAvgPrice = catEntries.length ? +(catEntries.reduce((sum, [, c]) => sum + c.avgPrice, 0) / catEntries.length).toFixed(2) : 0;
+              const topAll = catEntries.flatMap(([catId, c]) => c.topProducts.map(p => ({ ...p, category: catId }))).sort((a, b) => a.rank - b.rank).slice(0, 10);
+              const maxAvgPrice = Math.max(...catEntries.map(([, c]) => c.avgPrice), 1);
+              const maxProducts = Math.max(...catEntries.map(([, c]) => c.totalProducts), 1);
+              const brandCounts = {};
+              catEntries.forEach(([, c]) => Object.entries(c.brands).forEach(([b, cnt]) => { brandCounts[b] = (brandCounts[b] || 0) + cnt; }));
+              const topBrands = Object.entries(brandCounts).sort((a, b) => b[1] - a[1]).slice(0, 8);
+              const maxBrandCount = topBrands.length ? topBrands[0][1] : 1;
+              const totalDist = { under10: 0, '10to20': 0, '20to30': 0, '30to50': 0, over50: 0 };
+              catEntries.forEach(([, c]) => { Object.entries(c.priceDistribution).forEach(([k, v]) => { totalDist[k] += v; }); });
+              const maxDist = Math.max(...Object.values(totalDist), 1);
+              const COLORS = ["#6ee7b7", "#818cf8", "#fbbf24", "#f472b6", "#38bdf8", "#fb923c", "#a78bfa", "#34d399"];
+
+              return (
+                <div>
+                  {/* Summary Cards */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 36 }}>
+                    {[
+                      { label: "Total Products", value: totalProducts.toLocaleString(), color: "#6ee7b7", icon: "📦" },
+                      { label: "Unique Brands", value: allBrands.size.toLocaleString(), color: "#818cf8", icon: "🏷️" },
+                      { label: "Avg Price", value: `$${overallAvgPrice}`, color: "#fbbf24", icon: "💰" },
+                      { label: "Categories", value: catEntries.length, color: "#f472b6", icon: "📊" },
+                      { label: "Data Source", value: apiStatus?.mode === "live" ? "LIVE" : "DEMO", color: "#38bdf8", icon: "⚡" },
+                    ].map((s, i) => (
+                      <div key={i} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 20 }}>
+                        <div style={{ fontSize: 22, marginBottom: 8 }}>{s.icon}</div>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: s.color }}>{s.value}</div>
+                        <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Charts Row */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 36 }}>
+                    {/* Category Avg Price Chart */}
+                    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 24 }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: "#f1f5f9", marginBottom: 20 }}>Average Price by Category</h3>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {catEntries.map(([catId, c], i) => {
+                          const cat = CATEGORIES.find(ct => ct.id === catId);
+                          return (
+                            <div key={catId} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <div style={{ width: 80, fontSize: 11, color: "#94a3b8", textAlign: "right", flexShrink: 0 }}>{cat?.icon} {cat?.name || catId}</div>
+                              <div style={{ flex: 1, background: "rgba(255,255,255,0.05)", borderRadius: 4, height: 22, overflow: "hidden" }}>
+                                <div style={{ width: `${(c.avgPrice / maxAvgPrice) * 100}%`, height: "100%", background: `linear-gradient(90deg, ${COLORS[i % COLORS.length]}88, ${COLORS[i % COLORS.length]})`, borderRadius: 4, transition: "width 0.8s ease" }} />
+                              </div>
+                              <div style={{ width: 55, fontSize: 12, fontWeight: 600, color: COLORS[i % COLORS.length], textAlign: "right" }}>${c.avgPrice}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Category Product Count Chart */}
+                    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 24 }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: "#f1f5f9", marginBottom: 20 }}>Products by Category</h3>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                        {catEntries.map(([catId, c], i) => {
+                          const cat = CATEGORIES.find(ct => ct.id === catId);
+                          return (
+                            <div key={catId} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              <div style={{ width: 80, fontSize: 11, color: "#94a3b8", textAlign: "right", flexShrink: 0 }}>{cat?.icon} {cat?.name || catId}</div>
+                              <div style={{ flex: 1, background: "rgba(255,255,255,0.05)", borderRadius: 4, height: 22, overflow: "hidden" }}>
+                                <div style={{ width: `${(c.totalProducts / maxProducts) * 100}%`, height: "100%", background: `linear-gradient(90deg, ${COLORS[i % COLORS.length]}88, ${COLORS[i % COLORS.length]})`, borderRadius: 4, transition: "width 0.8s ease" }} />
+                              </div>
+                              <div style={{ width: 55, fontSize: 12, fontWeight: 600, color: COLORS[i % COLORS.length], textAlign: "right" }}>{c.totalProducts.toLocaleString()}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Second Row: Brand Share + Price Distribution */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 36 }}>
+                    {/* Brand Market Share */}
+                    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 24 }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: "#f1f5f9", marginBottom: 20 }}>Top Brands (by product count)</h3>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {topBrands.map(([brand, count], i) => (
+                          <div key={brand} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div style={{ width: 18, fontSize: 11, color: "#475569", textAlign: "right", flexShrink: 0 }}>{i + 1}</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                                <span style={{ fontSize: 12, color: "#cbd5e1", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 }}>{brand}</span>
+                                <span style={{ fontSize: 11, color: "#64748b" }}>{count} products</span>
+                              </div>
+                              <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 3, height: 6, overflow: "hidden" }}>
+                                <div style={{ width: `${(count / maxBrandCount) * 100}%`, height: "100%", background: COLORS[i % COLORS.length], borderRadius: 3 }} />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Price Distribution */}
+                    <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 24 }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: "#f1f5f9", marginBottom: 20 }}>Price Distribution</h3>
+                      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 160, paddingTop: 10 }}>
+                        {[
+                          { key: "under10", label: "<$10", color: "#6ee7b7" },
+                          { key: "10to20", label: "$10-20", color: "#38bdf8" },
+                          { key: "20to30", label: "$20-30", color: "#818cf8" },
+                          { key: "30to50", label: "$30-50", color: "#fbbf24" },
+                          { key: "over50", label: "$50+", color: "#f472b6" },
+                        ].map(({ key, label, color }) => (
+                          <div key={key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color, marginBottom: 6 }}>{totalDist[key]}</div>
+                            <div style={{ width: "100%", background: `${color}33`, borderRadius: "6px 6px 0 0", height: `${Math.max((totalDist[key] / maxDist) * 100, 4)}%`, transition: "height 0.8s ease", position: "relative" }}>
+                              <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${color}, ${color}88)`, borderRadius: "6px 6px 0 0" }} />
+                            </div>
+                            <div style={{ fontSize: 10, color: "#64748b", marginTop: 8, textAlign: "center" }}>{label}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Category Price Range Table */}
+                  <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 24, marginBottom: 36 }}>
+                    <h3 style={{ fontSize: 15, fontWeight: 700, color: "#f1f5f9", marginBottom: 20 }}>Category Price Range Analysis</h3>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                        <thead>
+                          <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+                            {["Category", "Products", "Avg Price", "Min", "Max", "Range", "Avg Rank"].map(h => (
+                              <th key={h} style={{ padding: "10px 12px", textAlign: "left", color: "#64748b", fontWeight: 600, fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {catEntries.map(([catId, c], i) => {
+                            const cat = CATEGORIES.find(ct => ct.id === catId);
+                            return (
+                              <tr key={catId} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.03)"}
+                                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                                <td style={{ padding: "10px 12px", color: "#e2e8f0", fontWeight: 600 }}>{cat?.icon} {cat?.name || catId}</td>
+                                <td style={{ padding: "10px 12px", color: "#94a3b8" }}>{c.totalProducts.toLocaleString()}</td>
+                                <td style={{ padding: "10px 12px", color: COLORS[i % COLORS.length], fontWeight: 600 }}>${c.avgPrice}</td>
+                                <td style={{ padding: "10px 12px", color: "#6ee7b7" }}>${c.minPrice.toFixed(2)}</td>
+                                <td style={{ padding: "10px 12px", color: "#f472b6" }}>${c.maxPrice.toFixed(2)}</td>
+                                <td style={{ padding: "10px 12px", color: "#fbbf24" }}>${(c.maxPrice - c.minPrice).toFixed(2)}</td>
+                                <td style={{ padding: "10px 12px", color: "#818cf8" }}>#{c.avgRank.toLocaleString()}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Top 10 Products */}
+                  <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: 24 }}>
+                    <h3 style={{ fontSize: 15, fontWeight: 700, color: "#f1f5f9", marginBottom: 20 }}>Top 10 Products by Sales Rank</h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {topAll.map((p, i) => {
+                        const cat = CATEGORIES.find(ct => ct.id === p.category);
+                        return (
+                          <div key={p.asin} style={{
+                            display: "flex", alignItems: "center", gap: 14, padding: "12px 16px",
+                            background: i < 3 ? `rgba(${i === 0 ? "251,191,36" : i === 1 ? "192,192,192" : "205,127,50"},0.06)` : "transparent",
+                            border: "1px solid rgba(255,255,255,0.05)", borderRadius: 10
+                          }}>
+                            <div style={{
+                              width: 28, height: 28, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: 13, fontWeight: 700,
+                              background: i === 0 ? "rgba(251,191,36,0.2)" : i === 1 ? "rgba(192,192,192,0.2)" : i === 2 ? "rgba(205,127,50,0.2)" : "rgba(255,255,255,0.05)",
+                              color: i === 0 ? "#fbbf24" : i === 1 ? "#c0c0c0" : i === 2 ? "#cd7f32" : "#64748b"
+                            }}>{i + 1}</div>
+                            {p.image && <img src={p.image} alt="" style={{ width: 36, height: 36, borderRadius: 6, objectFit: "contain", background: "#fff" }} />}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title}</div>
+                              <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{p.brand} · {cat?.icon} {cat?.name}</div>
+                            </div>
+                            <div style={{ textAlign: "right", flexShrink: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: "#6ee7b7" }}>#{p.rank.toLocaleString()}</div>
+                              {p.price && <div style={{ fontSize: 11, color: "#94a3b8" }}>${p.price.toFixed(2)}</div>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
-
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: "#f1f5f9", marginBottom: 16 }}>Browse Categories</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
-              {CATEGORIES.map(cat => (
-                <button key={cat.id} onClick={() => { setActiveTab("browse"); setActiveCategory(cat.id); }} style={{
-                  background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: 12, padding: "20px 16px", cursor: "pointer", textAlign: "center",
-                  transition: "all 0.2s", color: "#e2e8f0"
-                }}
-                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(110,231,183,0.08)"; e.currentTarget.style.borderColor = "rgba(110,231,183,0.3)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; }}
-                >
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>{cat.icon}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{cat.name}</div>
-                  <div style={{ fontSize: 11, color: "#6ee7b7", marginTop: 4 }}>Browse →</div>
-                </button>
-              ))}
-            </div>
+              );
+            })() : (
+              <div style={{ textAlign: "center", padding: 60, color: "#475569" }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
+                <p>Click "Refresh Data" to load trend analysis</p>
+              </div>
+            )}
           </div>
         )}
 
