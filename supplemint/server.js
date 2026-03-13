@@ -205,18 +205,26 @@ app.get('/api/products/:categoryId', async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Debug endpoint - shows raw SP-API response for first item
+// Debug endpoint - shows price extraction details
 app.get('/api/debug', async (req, res) => {
   try {
     const result = await spApiGet(`/catalog/2022-04-01/items?keywords=vitamin+supplements&marketplaceIds=${MARKETPLACE_ID}&includedData=summaries,attributes,salesRanks,images`);
     const items = result.data?.items || [];
-    res.json({
-      totalItems: items.length,
-      numberOfResults: result.data?.numberOfResults,
-      firstItem: items[0] || null,
-      firstItemAttributes: items[0]?.attributes || null,
-      allAttributeKeys: items[0]?.attributes ? Object.keys(items[0].attributes) : [],
+    const priceDebug = items.slice(0, 3).map(p => {
+      const attrs = p.attributes || {};
+      return {
+        asin: p.asin,
+        title: p.summaries?.[0]?.itemName,
+        list_price_raw: attrs.list_price || 'NOT_FOUND',
+        list_price_0: attrs.list_price?.[0] || 'NOT_FOUND',
+        list_price_0_value: attrs.list_price?.[0]?.value,
+        list_price_0_value_type: typeof attrs.list_price?.[0]?.value,
+        extractedPrice: extractPrice(attrs),
+        allPriceKeys: Object.keys(attrs).filter(k => k.toLowerCase().includes('price')),
+        allKeys: Object.keys(attrs),
+      };
     });
+    res.json({ totalItems: items.length, priceDebug });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
