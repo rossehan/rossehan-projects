@@ -824,7 +824,12 @@ function SuppleMint() {
 
                   {/* Top 100 Products */}
                   {(() => {
-                    const filteredTop = top100CatFilters.length === 0 ? topAll : topAll.filter(p => top100CatFilters.includes(p.category));
+                    const filteredTop = top100CatFilters.length === 0 ? topAll
+                      : catEntries
+                          .filter(([catId]) => top100CatFilters.includes(catId))
+                          .flatMap(([catId, c]) => (c.topProducts || []).map(p => ({ ...p, category: catId })))
+                          .sort((a, b) => a.rank - b.rank)
+                          .slice(0, 100);
                     const filterLabel = top100CatFilters.length === 0 ? "Top 100 Products by Sales Rank"
                       : top100CatFilters.length === 1 ? (() => { const sc = CATEGORIES.find(c => c.id === top100CatFilters[0]); return `${sc?.icon} ${sc?.name} - Top Products`; })()
                       : `${top100CatFilters.length} Categories Selected - Top Products`;
