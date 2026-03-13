@@ -64,6 +64,16 @@ const CATEGORIES = [
   { id: "maca", name: "Maca", icon: "\u{1F30B}" },
   { id: "saw_palmetto", name: "Saw Palmetto", icon: "\u{1F334}" },
   { id: "milk_thistle", name: "Milk Thistle", icon: "\u{1F33C}" },
+  { id: "rhodiola", name: "Rhodiola", icon: "\u{1F3D4}\uFE0F" },
+  { id: "valerian", name: "Valerian", icon: "\u{1F30C}" },
+  { id: "fenugreek", name: "Fenugreek", icon: "\u{1F33F}" },
+  { id: "black_seed_oil", name: "Black Seed Oil", icon: "\u{1F311}" },
+  { id: "quercetin", name: "Quercetin", icon: "\u{1F34E}" },
+  { id: "resveratrol", name: "Resveratrol", icon: "\u{1F347}" },
+  { id: "lions_mane", name: "Lion's Mane", icon: "\u{1F981}" },
+  { id: "reishi", name: "Reishi", icon: "\u{1F344}" },
+  { id: "berberine", name: "Berberine", icon: "\u{1F7E1}" },
+  { id: "digestive_enzymes", name: "Digestive Enzymes", icon: "\u{1F9EC}" },
 ];
 
 const ALL_BRANDS = ["Nature's Bounty", "NOW Foods", "Garden of Life", "Optimum Nutrition", "Vital Proteins",
@@ -446,7 +456,7 @@ function SuppleMint() {
 
       {/* Nav */}
       <div style={{ padding: "0 32px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", gap: 4 }}>
-        {[["dashboard", "\u{1F4CA} Dashboard"], ["browse", "\u{1F50D} Browse"], ["search", "\u{1F50E} Search"]].map(([id, label]) => (
+        {[["dashboard", "\u{1F4CA} Dashboard"], ["browse", "\u{1F50D} Browse & Search"]].map(([id, label]) => (
           <button key={id} onClick={() => setActiveTab(id)} style={{
             background: "none", border: "none", cursor: "pointer", padding: "14px 16px",
             fontSize: 13, fontWeight: 600, color: activeTab === id ? "#6ee7b7" : "#64748b",
@@ -729,10 +739,44 @@ function SuppleMint() {
           </div>
         )}
 
-        {/* BROWSE TAB */}
+        {/* BROWSE & SEARCH TAB */}
         {activeTab === "browse" && (
           <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+            {/* Search bar */}
+            <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+              <input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSearch()}
+                placeholder="Search supplements... (e.g. vitamin c, protein, NOW Foods)"
+                style={{
+                  flex: 1, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 10, padding: "12px 16px", color: "#e2e8f0", fontSize: 14, outline: "none"
+                }}
+              />
+              <button onClick={handleSearch} style={{
+                background: "linear-gradient(135deg, #6ee7b7, #3b82f6)", border: "none",
+                borderRadius: 10, padding: "12px 24px", color: "#000", fontWeight: 700,
+                cursor: "pointer", fontSize: 14
+              }}>Search</button>
+            </div>
+
+            {/* Search Results */}
+            {searchResults.length > 0 && (
+              <div style={{ marginBottom: 28 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <h2 style={{ fontSize: 18, fontWeight: 700, color: "#f1f5f9" }}>Search Results ({searchResults.length})</h2>
+                  <button onClick={() => setSearchResults([])} style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "6px 12px", color: "#94a3b8", cursor: "pointer", fontSize: 12 }}>Clear</button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+                  {searchResults.map(p => <ProductCard key={p.asin} product={p} onClick={setSelectedProduct} />)}
+                </div>
+                <div style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", margin: "28px 0" }} />
+              </div>
+            )}
+
+            {/* Category header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
               <div>
                 <h1 style={{ fontSize: 24, fontWeight: 700, color: "#f1f5f9" }}>
                   {CATEGORIES.find(c => c.id === activeCategory)?.icon} {CATEGORIES.find(c => c.id === activeCategory)?.name}
@@ -763,49 +807,6 @@ function SuppleMint() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
                 {products.map(p => <ProductCard key={p.asin} product={p} onClick={setSelectedProduct} />)}
                 {products.length === 0 && <div style={{ color: "#475569", gridColumn: "1/-1", textAlign: "center", padding: 60 }}>No products found</div>}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* SEARCH TAB */}
-        {activeTab === "search" && (
-          <div>
-            <h1 style={{ fontSize: 24, fontWeight: 700, color: "#f1f5f9", marginBottom: 24 }}>{"\u{1F50E}"} Product Search</h1>
-            <div style={{ display: "flex", gap: 12, marginBottom: 32 }}>
-              <input
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleSearch()}
-                placeholder="Search supplements... (e.g. vitamin c, protein, NOW Foods)"
-                style={{
-                  flex: 1, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 10, padding: "12px 16px", color: "#e2e8f0", fontSize: 14, outline: "none"
-                }}
-              />
-              <button onClick={handleSearch} style={{
-                background: "linear-gradient(135deg, #6ee7b7, #3b82f6)", border: "none",
-                borderRadius: 10, padding: "12px 24px", color: "#000", fontWeight: 700,
-                cursor: "pointer", fontSize: 14
-              }}>Search</button>
-            </div>
-
-            {loading ? (
-              <div style={{ textAlign: "center", padding: 80 }}>
-                <div style={{ width: 40, height: 40, border: "3px solid rgba(110,231,183,0.2)", borderTopColor: "#6ee7b7", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
-                <div style={{ color: "#64748b" }}>Searching...</div>
-              </div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
-                {searchResults.map(p => <ProductCard key={p.asin} product={p} onClick={setSelectedProduct} />)}
-                {searchResults.length === 0 && searchQuery && !loading && (
-                  <div style={{ color: "#475569", gridColumn: "1/-1", textAlign: "center", padding: 60 }}>No results for "{searchQuery}"</div>
-                )}
-                {!searchQuery && (
-                  <div style={{ color: "#475569", gridColumn: "1/-1", textAlign: "center", padding: 60 }}>
-                    Enter a search term to find supplements
-                  </div>
-                )}
               </div>
             )}
           </div>

@@ -157,7 +157,12 @@ const CATEGORY_KEYWORDS = {
   echinacea: 'echinacea supplement', ginseng: 'ginseng supplement',
   garlic: 'garlic supplement', greenTea: 'green tea extract supplement',
   appleCiderVinegar: 'apple cider vinegar supplement', maca: 'maca root supplement',
-  saw_palmetto: 'saw palmetto supplement', milk_thistle: 'milk thistle supplement'
+  saw_palmetto: 'saw palmetto supplement', milk_thistle: 'milk thistle supplement',
+  rhodiola: 'rhodiola rosea supplement', valerian: 'valerian root supplement',
+  fenugreek: 'fenugreek supplement', black_seed_oil: 'black seed oil supplement',
+  quercetin: 'quercetin supplement', resveratrol: 'resveratrol supplement',
+  lions_mane: 'lions mane mushroom supplement', reishi: 'reishi mushroom supplement',
+  berberine: 'berberine supplement', digestive_enzymes: 'digestive enzymes supplement'
 };
 
 app.get('/api/categories', (req, res) => {

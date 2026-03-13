@@ -19,8 +19,8 @@
 - `/supplemint/.env` - SP-API credentials (gitignored)
 
 ## Completed Features
-1. Dashboard with 3 tabs: Dashboard, Browse, Search
-2. 20 supplement categories with real SP-API data
+1. Dashboard with 2 tabs: Dashboard, Browse & Search (merged)
+2. 50 supplement categories with real SP-API data
 3. Top 100 Products by Sales Rank (clickable -> detail modal)
 4. Product images (64px thumbnail) in Top 100 list
 5. Amazon link button (orange arrow) on each product row
@@ -36,6 +36,9 @@
 15. Larger product images (64px) and text (15px title, 13px brand) in Top 100
 16. Demo mode fallback when SP-API unavailable
 17. Debug endpoint at /api/debug
+18. All graph visualizations replaced with ranked number tables
+19. Revenue = price * dailySales * 30 (monthly)
+20. Browse & Search tabs merged into one combined tab
 
 ## SP-API Data Structure (CRITICAL - DO NOT FORGET)
 - **Price**: `list_price[0].value` is a direct NUMBER (e.g. 17.98), NOT `{amount: "xx.xx"}`
@@ -61,15 +64,15 @@
 ## Server Endpoints
 - GET `/` - Serves dashboard.html
 - GET `/api/health` - Connection status (live/demo)
-- GET `/api/trends` - All 20 categories data (prices, ranks, brands, topProducts)
+- GET `/api/trends` - All 50 categories data (prices, ranks, brands, topProducts)
 - GET `/api/search?q=keyword` - Search products
 - GET `/api/product/:asin` - Single product details
 - GET `/api/products/:categoryId` - Products by category
 - GET `/api/categories` - List all categories
 - GET `/api/debug` - Debug SP-API response structure
 
-## Category Keywords (20 categories)
-vitamins, protein, omega, probiotics, collagen, magnesium, vitaminD, vitaminC, zinc, iron, calcium, biotin, melatonin, ashwagandha, creatine, turmeric, elderberry, fiber, multivitamin, bcaa
+## Category Keywords (50 categories)
+vitamins, protein, omega, probiotics, collagen, magnesium, vitaminD, vitaminC, zinc, iron, calcium, biotin, melatonin, ashwagandha, creatine, turmeric, elderberry, fiber, multivitamin, bcaa, glutamine, coq10, vitaminB, vitaminE, vitaminK, potassium, selenium, manganese, lysine, glucosamine, spirulina, chlorella, echinacea, ginseng, garlic, greenTea, appleCiderVinegar, maca, saw_palmetto, milk_thistle, rhodiola, valerian, fenugreek, black_seed_oil, quercetin, resveratrol, lions_mane, reishi, berberine, digestive_enzymes
 
 ## How to Update Files on Local PC
 ```powershell
