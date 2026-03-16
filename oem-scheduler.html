@@ -100,15 +100,44 @@ tr:hover{background:#f8f9ff}
 .step-row .step-input:focus{border-color:#1a73e8;outline:none}
 .step-row .step-unit{font-size:12px;color:#888;flex-shrink:0}
 .step-row.zero-days{opacity:.5}
-.parallel-header{background:linear-gradient(90deg,#e8f0fe,#f3e8fd);padding:10px 14px;border-radius:8px;margin:16px 0 8px;font-size:13px;font-weight:600;color:#1a73e8;display:flex;align-items:center;gap:8px}
-.parallel-end{border-top:2px dashed #c8d6e5;margin:8px 0 16px;padding-top:8px;font-size:12px;color:#888;font-weight:500;text-align:center}
-.track-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;margin-left:8px;vertical-align:middle}
-.tb-inspect{background:#e3f2fd;color:#1565c0}
-.tb-stability{background:#fff3e0;color:#e65100}
-.tb-design{background:#f3e5f5;color:#6a1b9a}
-.tb-inspect2{background:#e3f2fd;color:#1565c0}
-.tb-design2{background:#f3e5f5;color:#6a1b9a}
 .total-bar{background:#1a73e8;color:#fff;padding:14px 20px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-top:12px}
+/* 병렬 구간 박스 */
+.pbox{border:2px solid #c8d6e5;border-radius:12px;margin:20px 0;overflow:hidden}
+.pbox-header{background:linear-gradient(90deg,#e8f0fe,#f3e8fd);padding:12px 16px;font-size:14px;font-weight:700;color:#1a73e8;display:flex;align-items:center;gap:8px;border-bottom:2px solid #c8d6e5}
+.pbox-tracks{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0}
+.pbox-track{padding:14px;border-right:1px solid #e8e8e8}
+.pbox-track:last-child{border-right:none}
+.pbox-track-title{font-size:12px;font-weight:700;padding:4px 10px;border-radius:4px;margin-bottom:10px;display:inline-block}
+.pbox-track-title.tt-blue{background:#e3f2fd;color:#1565c0}
+.pbox-track-title.tt-orange{background:#fff3e0;color:#e65100}
+.pbox-track-title.tt-purple{background:#f3e5f5;color:#6a1b9a}
+.pbox-track .step-row{margin-bottom:6px;padding:8px 10px;font-size:12px}
+.pbox-track .step-row .step-num{width:22px;height:22px;font-size:10px}
+.pbox-track .step-row .step-input{width:56px;font-size:13px;padding:4px 6px}
+.pbox-track-sum{font-size:12px;font-weight:600;color:#555;margin-top:8px;padding-top:8px;border-top:1px dashed #ddd;text-align:right}
+.pbox-footer{background:#f0f4f8;padding:10px 16px;font-size:12px;color:#555;text-align:center;border-top:2px solid #c8d6e5}
+.pbox-footer strong{color:#1a73e8}
+/* 트랙 배지 (결과 테이블용) */
+.track-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600}
+.tb-inspect,.tb-inspect2{background:#e3f2fd;color:#1565c0}
+.tb-stability{background:#fff3e0;color:#e65100}
+.tb-design,.tb-design2{background:#f3e5f5;color:#6a1b9a}
+/* AI 분석 */
+.ai-card{background:linear-gradient(135deg,#faf5ff,#eef2ff);border:1px solid #c4b5fd;border-radius:12px;padding:24px;margin-bottom:20px}
+.ai-card .card-title{color:#6d28d9;display:flex;align-items:center;gap:8px}
+.ai-section{margin-bottom:16px}
+.ai-section-title{font-size:14px;font-weight:700;margin-bottom:8px;color:#333}
+.ai-tip{padding:12px 16px;background:#fff;border-radius:8px;margin-bottom:8px;border-left:4px solid #1a73e8}
+.ai-tip.critical{border-left-color:#ea4335;background:#fef7f7}
+.ai-tip.good{border-left-color:#0f9d58;background:#f7fef7}
+.ai-tip.warn{border-left-color:#f9ab00;background:#fffef7}
+.ai-tip-title{font-weight:700;font-size:13px;margin-bottom:4px}
+.ai-tip-body{font-size:12px;color:#555;line-height:1.7}
+.ai-tip-body ul{margin:4px 0 0 16px;padding:0}
+.ai-tip-body li{margin-bottom:2px}
+.ai-summary{background:#fff;border-radius:8px;padding:16px;border:1px solid #e0e0e0}
+.ai-summary table{font-size:13px}
+.ai-summary th{background:transparent;font-size:12px}
 /* Autocomplete */
 .ac-wrap{position:relative}
 .ac-list{position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #ddd;border-top:none;border-radius:0 0 8px 8px;max-height:240px;overflow-y:auto;z-index:50;display:none}
@@ -182,6 +211,7 @@ tr:hover{background:#f8f9ff}
 </div>
 <div class="btn-group" style="margin-top:16px;">
 <button class="btn btn-primary" onclick="calculateSchedule()">일정 계산하기</button>
+<button class="btn btn-success" onclick="aiAnalyze()" style="background:#6d28d9;">AI 일정 분석</button>
 <button class="btn btn-secondary" onclick="resetAll()">초기화</button>
 </div>
 </div>
@@ -196,6 +226,10 @@ tr:hover{background:#f8f9ff}
 <div class="card" id="timelineCard" style="display:none;">
 <div class="card-title">단계별 타임라인</div>
 <div class="timeline" id="timelineView"></div>
+</div>
+<div class="ai-card" id="aiCard" style="display:none;">
+<div class="card-title">AI 일정 분석</div>
+<div id="aiResult"></div>
 </div>
 </div>
 <!-- TAB: 개발 체크리스트 -->
@@ -417,41 +451,79 @@ gmap.forEach((tracks,g)=>{if(tracks.size>1)parallel.add(g)});
 return parallel
 }
 
-// STEP INPUTS (number input, 0부터 시작 가능, 병렬 구간 표시)
+// 트랙별 CSS 클래스
+const trackCss={'검사·인허가':'tt-blue','안정성':'tt-orange','디자인·광고':'tt-purple','검사·신고':'tt-blue','디자인':'tt-purple'};
+
+// STEP INPUTS (순차=리스트, 병렬=3열 카드)
 function renderStepInputs(){
 const type=document.getElementById('productType').value;
 const steps=scheduleSteps[type];
 const parallel=analyzeGroups(steps);
-let html='',num=1,inParallel=false;
-steps.forEach((s,i)=>{
-const isP=parallel.has(s.group);
-if(isP&&!inParallel){
-html+=`<div class="parallel-header"><span>&#8644;</span> 병렬 구간 — 아래 단계들은 동시에 진행됩니다 (가장 긴 트랙 기준)</div>`;
-inParallel=true
-}
-if(!isP&&inParallel){
-html+=`<div class="parallel-end">&#9650; 병렬 구간 종료 — 모든 트랙 완료 후 다음 단계 진행</div>`;
-inParallel=false
-}
-const tb=s.track&&trackMeta[s.track]?`<span class="track-badge ${trackMeta[s.track].css}">${trackMeta[s.track].label}</span>`:'';
+// 그룹 순서대로 정리
+const groupOrder=[];const groupMap=new Map();
+steps.forEach(s=>{
+if(!groupMap.has(s.group)){groupMap.set(s.group,{steps:[],tracks:new Map(),isP:parallel.has(s.group)});groupOrder.push(s.group)}
+const g=groupMap.get(s.group);g.steps.push(s);
+const t=s.track||'main';if(!g.tracks.has(t))g.tracks.set(t,[]);g.tracks.get(t).push(s)
+});
+let html='',num=1;
+groupOrder.forEach(gk=>{
+const g=groupMap.get(gk);
+if(!g.isP){
+// 순차 단계: 기존 리스트
+g.steps.forEach(s=>{
 html+=`<div class="step-row${s.defaultDays===0?' zero-days':''}" id="row_${s.id}">
 <div class="step-num">${num++}</div>
-<div class="step-info">
-<div class="step-name">${s.name}${tb}</div>
-<div class="step-basis">${s.basis}</div>
-</div>
+<div class="step-info"><div class="step-name">${s.name}</div><div class="step-basis">${s.basis}</div></div>
 <input type="number" class="step-input" id="input_${s.id}" min="0" max="365" value="${s.defaultDays}" onchange="onStepChange('${s.id}')" oninput="onStepChange('${s.id}')">
-<div class="step-unit">일</div>
-</div>`});
-if(inParallel)html+=`<div class="parallel-end">&#9650; 병렬 구간 종료 — 모든 트랙 완료 후 다음 단계 진행</div>`;
+<div class="step-unit">일</div></div>`})
+}else{
+// 병렬 구간: 카드 3열
+html+=`<div class="pbox"><div class="pbox-header">&#8644; 동시 진행 구간 — 아래 트랙들이 동시에 시작됩니다</div><div class="pbox-tracks">`;
+g.tracks.forEach((tSteps,tName)=>{
+if(tName==='main')return;
+const css=trackCss[tName]||'tt-blue';
+html+=`<div class="pbox-track"><div class="pbox-track-title ${css}">${tName}</div>`;
+tSteps.forEach(s=>{
+html+=`<div class="step-row${s.defaultDays===0?' zero-days':''}" id="row_${s.id}">
+<div class="step-num">${num++}</div>
+<div class="step-info"><div class="step-name">${s.name}</div><div class="step-basis" style="font-size:10px">${s.basis}</div></div>
+<input type="number" class="step-input" id="input_${s.id}" min="0" max="365" value="${s.defaultDays}" onchange="onStepChange('${s.id}')" oninput="onStepChange('${s.id}')">
+<div class="step-unit">일</div></div>`});
+html+=`<div class="pbox-track-sum" id="tracksum_${gk}_${tName}">소계: ${tSteps.reduce((a,s)=>a+s.defaultDays,0)}일</div></div>`
+});
+html+=`</div><div class="pbox-footer" id="pbox-footer-${gk}">가장 긴 트랙 기준으로 다음 단계 진행</div></div>`
+}
+});
 document.getElementById('stepInputs').innerHTML=html;
-updateTotalDisplay()
+updateTotalDisplay();updateParallelFooters()
+}
+function updateParallelFooters(){
+const type=document.getElementById('productType').value;
+const steps=scheduleSteps[type];
+const parallel=analyzeGroups(steps);
+const gmap=new Map();
+steps.forEach(s=>{
+if(!parallel.has(s.group))return;
+const t=s.track||'main';const days=parseInt(document.getElementById('input_'+s.id)?.value)||0;
+if(!gmap.has(s.group))gmap.set(s.group,new Map());
+const tm=gmap.get(s.group);tm.set(t,(tm.get(t)||0)+days);
+// 트랙 소계 업데이트
+const sumEl=document.getElementById(`tracksum_${s.group}_${t}`);
+if(sumEl)sumEl.textContent=`소계: ${tm.get(t)}일`
+});
+gmap.forEach((tm,g)=>{
+const maxT=Math.max(...tm.values(),0);
+let maxName='';tm.forEach((v,k)=>{if(v===maxT)maxName=k});
+const el=document.getElementById(`pbox-footer-${g}`);
+if(el)el.innerHTML=`<strong>${maxName}</strong> 트랙이 가장 김 (<strong>${maxT}일</strong>) — 이 기간 동안 나머지 트랙도 함께 진행`
+})
 }
 function onStepChange(id){
 const row=document.getElementById('row_'+id);
 const val=parseInt(document.getElementById('input_'+id).value)||0;
 row.classList.toggle('zero-days',val===0);
-updateTotalDisplay()
+updateTotalDisplay();updateParallelFooters()
 }
 function calcParallelTotal(steps){
 // 그룹별 실제 소요일 계산 (병렬 그룹은 max)
@@ -577,7 +649,149 @@ function renderTimeline(dates,today){
 document.getElementById('timelineView').innerHTML=dates.map(d=>{let st='';if(today>d.end)st='completed';else if(today>=d.start&&today<=d.end)st='current';
 return `<div class="timeline-item ${st}"><div class="timeline-header">${d.name}</div><div class="timeline-date">${fmt(d.start)} ~ ${fmt(d.end)} (${d.days}일)</div><div class="timeline-desc">${d.desc}</div></div>`}).join('')
 }
-function resetAll(){document.getElementById('productType').value='health';document.getElementById('targetDate').value='';renderStepInputs();document.getElementById('resultCard').style.display='none';document.getElementById('ganttCard').style.display='none';document.getElementById('timelineCard').style.display='none'}
+function resetAll(){document.getElementById('productType').value='health';document.getElementById('targetDate').value='';renderStepInputs();document.getElementById('resultCard').style.display='none';document.getElementById('ganttCard').style.display='none';document.getElementById('timelineCard').style.display='none';document.getElementById('aiCard').style.display='none'}
+
+// AI 일정 분석
+const stepAdvice={
+concept:{min:3,tips:['경쟁제품 분석 범위를 Top 3~5개로 좁히세요','기존 자사 제품 라인업과 연계하면 기획 시간 단축','컨셉이 이미 확정되어 있다면 0일로 설정 가능']},
+ingredient:{min:3,tips:['고시형 원료 중 이미 검증된 원료 사용 시 단축 가능','원료사에 미리 샘플 요청해두면 병행 가능','다빈도 사용 원료(비타민C, 프로바이오틱스 등)는 즉시 수급 가능']},
+formula:{min:3,tips:['OEM사 기존 레시피(stock formula) 활용하면 3일 이내 가능','단일 원료 제품은 배합 복잡도가 낮아 단축 가능','OEM 연구원 사전 미팅으로 배합 방향 잡아두세요']},
+sample:{min:5,tips:['시제품 횟수를 1회로 줄이면 대폭 단축 (맛/형태 확정 시)','OEM사 표준 제형 활용 시 시제품 없이 바로 양산 가능한 경우도','시제품과 영양성분 분석을 동시에 의뢰하세요']},
+nutrition:{min:5,tips:['특급 분석(3~5일) 의뢰하면 단축 가능 (추가 비용)','영양성분 분석과 기준규격 검사를 동일 기관에 동시 의뢰','OEM사 자체 분석 가능 여부 확인']},
+stability:{min:14,tips:['가속시험 1개월(최소)로 단축 — 단, 유통기한 설정 근거 약해질 수 있음','유사 제품 안정성 데이터가 있으면 활용 가능','OEM사가 동일 제형 안정성 데이터를 보유한 경우 기간 대폭 단축','안정성 시험은 가장 긴 병목이므로 시제품 완성 즉시 의뢰하세요']},
+standard:{min:5,tips:['특급 의뢰 시 5일 내 가능 (추가 비용)','영양성분 분석과 같은 기관에 동시 의뢰하면 효율적','OEM사 자체 품질검사실 활용 가능 여부 확인']},
+design:{min:7,tips:['디자인 시안을 1~2차 이내로 확정하면 단축','법정 표시사항 템플릿을 미리 준비하세요','디자인 외주 시 시제품 단계부터 동시 진행 가능']},
+barcode:{min:1,tips:['GS1 Korea 업체코드가 이미 있으면 1일 내 발급','신규 업체코드 신청은 5~7일 — 미리 신청해두세요','업체코드 발급과 디자인을 병행하세요']},
+ad_review:{min:5,tips:['한국건강기능식품협회 사전심의 절차 숙지 필수','기능성 표현을 고시형 기준 표현으로만 작성하면 1차 통과율 높음','보완 시 +5일이므로 처음부터 심의 기준에 맞춰 작성']},
+approval:{min:5,tips:['서류를 완벽하게 준비하면 5일 이내 가능','제조방법설명서, 시험검사성적서 미리 완비','식약처 온라인 제출 시 오류 없게 사전 점검']},
+production:{min:5,tips:['OEM 공장 라인 예약을 2~3주 전에 미리 하세요','원료 사전 입고로 양산 대기시간 제거','소량(5,000개 이하) 양산은 3~5일 가능']},
+finished_qc:{min:3,tips:['특급 검사 의뢰 시 3~5일 (추가 비용)','OEM사 자체 품질검사 후 위탁검사 병행하면 효율적','양산과 동시에 검사 일정 예약해두세요']},
+self_qc:{min:3,tips:['자체 검사실이 있으면 1~2일 가능','위탁 시 특급 의뢰 고려','양산 전 검사기관 일정 사전 예약']},
+ship:{min:1,tips:['물류 파트너를 미리 확정해두면 1~2일 가능','포장 완료 즉시 출하 가능하도록 물류 사전 조율']},
+report:{min:1,tips:['서류를 사전에 완비하면 1일 처리 가능','관할 시군구청 담당자에게 사전 문의']},
+};
+
+function aiAnalyze(){
+const type=document.getElementById('productType').value;
+const steps=scheduleSteps[type];
+const parallel=analyzeGroups(steps);
+const targetDateStr=document.getElementById('targetDate').value;
+
+// 각 단계 일수 수집
+const stepData=steps.map(s=>({...s,days:parseInt(document.getElementById('input_'+s.id)?.value)||0}));
+const realTotal=calcParallelTotal(steps);
+const seqTotal=stepData.reduce((a,s)=>a+s.days,0);
+
+// 그룹별 정보
+const gmap=new Map();
+stepData.forEach(s=>{
+const t=s.track||'main';
+if(!gmap.has(s.group))gmap.set(s.group,{tracks:new Map(),isP:parallel.has(s.group)});
+const tm=gmap.get(s.group).tracks;
+if(!tm.has(t))tm.set(t,{days:0,steps:[]});
+const td=tm.get(t);td.days+=s.days;td.steps.push(s)
+});
+
+// 크리티컬 패스 찾기 (병렬 그룹에서 가장 긴 트랙)
+let criticalPath=[];
+gmap.forEach((gd,g)=>{
+if(gd.isP){
+let maxD=0,maxT='';
+gd.tracks.forEach((td,t)=>{if(td.days>maxD){maxD=td.days;maxT=t}});
+gd.tracks.forEach((td,t)=>{
+if(t===maxT)td.steps.forEach(s=>{if(s.days>0)criticalPath.push({...s,isCritical:true})});
+})
+}else{
+gd.tracks.forEach(td=>td.steps.forEach(s=>{if(s.days>0)criticalPath.push({...s,isCritical:false})}))
+}
+});
+
+let html='';
+
+// 1. 요약
+html+=`<div class="ai-section"><div class="ai-section-title">1. 일정 요약</div><div class="ai-summary"><table>
+<tr><th>병렬 반영 총 일정</th><td><strong>${realTotal}일</strong> (${(realTotal/7).toFixed(1)}주)</td></tr>
+<tr><th>순차 합산 시</th><td>${seqTotal}일</td></tr>
+<tr><th>병렬 절약</th><td><strong>${seqTotal-realTotal}일</strong> 단축</td></tr>
+${targetDateStr?`<tr><th>목표일까지</th><td>${Math.round((new Date(targetDateStr)-new Date())/(864e5))}일 남음</td></tr>`:''}</table></div></div>`;
+
+// 2. 크리티컬 패스 (일정을 결정하는 핵심 경로)
+html+=`<div class="ai-section"><div class="ai-section-title">2. 크리티컬 패스 (일정을 결정하는 핵심 단계)</div>`;
+html+=`<div class="ai-tip"><div class="ai-tip-title">이 단계들이 전체 일정을 결정합니다</div><div class="ai-tip-body">아래 단계 중 하나라도 줄이면 전체 일정이 단축됩니다:<ul>`;
+criticalPath.forEach(s=>{
+html+=`<li><strong>${s.name}</strong>: ${s.days}일${s.isCritical?' (병렬 구간 병목)':''}</li>`
+});
+html+=`</ul>크리티컬 패스 합계: <strong>${criticalPath.reduce((a,s)=>a+s.days,0)}일</strong> = 실제 전체 일정</div></div></div>`;
+
+// 3. 단축 가능한 단계별 조언
+const longSteps=stepData.filter(s=>s.days>0).sort((a,b)=>b.days-a.days);
+html+=`<div class="ai-section"><div class="ai-section-title">3. 일정 단축 방법 (단계별 조언)</div>`;
+longSteps.forEach(s=>{
+const adv=stepAdvice[s.id];if(!adv)return;
+const canSave=s.days-adv.min;
+const cls=canSave>=7?'critical':canSave>=3?'warn':'good';
+const label=canSave>=7?'대폭 단축 가능':canSave>=3?'단축 여지 있음':'적정 수준';
+html+=`<div class="ai-tip ${cls}"><div class="ai-tip-title">${s.name}: ${s.days}일 → 최소 ${adv.min}일 가능 (${canSave>0?'-'+canSave+'일':label})</div><div class="ai-tip-body"><ul>`;
+adv.tips.forEach(t=>{html+=`<li>${t}</li>`});
+html+=`</ul></div></div>`
+});
+html+=`</div>`;
+
+// 4. 전략적 제안
+html+=`<div class="ai-section"><div class="ai-section-title">4. 전략적 제안</div>`;
+
+// 병렬 그룹의 비효율 체크
+gmap.forEach((gd,g)=>{
+if(!gd.isP)return;
+let maxD=0,maxT='';const trackInfo=[];
+gd.tracks.forEach((td,t)=>{trackInfo.push({name:t,days:td.days});if(td.days>maxD){maxD=td.days;maxT=t}});
+const waste=trackInfo.filter(t=>t.name!==maxT).map(t=>({name:t.name,idle:maxD-t.days}));
+if(waste.length){
+html+=`<div class="ai-tip warn"><div class="ai-tip-title">병렬 구간 최적화</div><div class="ai-tip-body">
+<strong>${maxT}</strong> 트랙(${maxD}일)이 병목입니다.<ul>`;
+waste.forEach(w=>{
+if(w.idle>0)html+=`<li><strong>${w.name}</strong> 트랙은 ${w.idle}일 여유 — ${maxT} 트랙을 줄이면 전체 일정 단축</li>`
+});
+html+=`</ul>${maxT} 트랙의 일수를 줄이는 것이 전체 일정 단축의 핵심입니다.</div></div>`
+}
+});
+
+// 목표일 분석
+if(targetDateStr){
+const daysLeft=Math.round((new Date(targetDateStr)-new Date())/(864e5));
+if(daysLeft<realTotal){
+const gap=realTotal-daysLeft;
+html+=`<div class="ai-tip critical"><div class="ai-tip-title">목표일 초과: ${gap}일 부족</div><div class="ai-tip-body">
+현재 설정으로는 목표일보다 <strong>${gap}일</strong> 늦어집니다. 다음을 고려하세요:<ul>
+<li>크리티컬 패스의 가장 긴 단계부터 우선 단축</li>
+<li>안정성 시험: 가속시험 기간 최소화 또는 유사제품 데이터 활용</li>
+<li>검사/분석: 특급 의뢰로 기간 단축 (비용 증가)</li>
+<li>디자인: 시안 확정 횟수 최소화, 템플릿 활용</li>
+<li>목표일 재조정 검토</li></ul></div></div>`
+}else{
+html+=`<div class="ai-tip good"><div class="ai-tip-title">목표일 달성 가능: ${daysLeft-realTotal}일 여유</div><div class="ai-tip-body">
+현재 설정으로 목표일까지 <strong>${daysLeft-realTotal}일</strong> 여유가 있습니다. 버퍼로 활용하거나, 시제품 테스트를 추가로 진행할 수 있습니다.</div></div>`
+}
+}
+
+// 빠른 단축 Top 3
+const quickWins=longSteps.filter(s=>stepAdvice[s.id]&&s.days-stepAdvice[s.id].min>=3)
+.map(s=>({...s,save:s.days-stepAdvice[s.id].min})).sort((a,b)=>b.save-a.save).slice(0,3);
+if(quickWins.length){
+const totalSavable=quickWins.reduce((a,s)=>a+s.save,0);
+html+=`<div class="ai-tip"><div class="ai-tip-title">빠른 단축 Top ${quickWins.length} (최대 ${totalSavable}일 절약 가능)</div><div class="ai-tip-body"><ul>`;
+quickWins.forEach((s,i)=>{
+html+=`<li><strong>${i+1}. ${s.name}</strong>: ${s.days}일 → ${stepAdvice[s.id].min}일 (${s.save}일 절약)</li>`
+});
+html+=`</ul></div></div>`
+}
+
+html+=`</div>`;
+
+document.getElementById('aiResult').innerHTML=html;
+document.getElementById('aiCard').style.display='block';
+document.getElementById('aiCard').scrollIntoView({behavior:'smooth'})
+}
 
 // CHECKLIST
 function renderChecklist(){
