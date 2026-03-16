@@ -81,11 +81,19 @@
 56. AI Domination now has 7 sub-tabs: Domination Score, Keyword Intelligence, Trend Analysis, Hashtag Discovery, Longtail Keywords, Legal Barrier, Margin Calculator
 57. Market Intel now has 6 sub-tabs: Overview, YouTube, Reddit, FDA Safety, Google Trends, Pain Points
 
+58. AI Supplement Formulator - "Market Intel" tab replaced with "AI Formulator"
+59. Gemini 2.0 Flash integration for AI-powered product formulation
+60. 12 health concern categories: sleep, immunity, gut, energy, beauty, weight, joints, mens, womens, longevity, stress, muscle
+61. /api/ai-formulator/context: 5-API data aggregation (SP-API + Reddit + FDA + Google Trends + Margin)
+62. /api/ai-formulator/generate: Gemini LLM product formulation with structured JSON output
+63. AI generates: product name, ingredients, competitor weaknesses, FDA safety report, pricing strategy, Amazon listing copy
+
 ## External API Keys
 - YOUTUBE_API_KEY: Optional, in .env file. Demo mode works without it.
 - Reddit: No key needed (public JSON endpoints)
 - OpenFDA: No key needed (completely free)
 - Google Trends: No key needed (scraping approach)
+- GEMINI_API_KEY: Required for AI Formulator. Free at https://aistudio.google.com/apikey (15 RPM)
 - Amazon Autocomplete: No key needed (public endpoint completion.amazon.com)
 - USPTO/Google Patents: No key needed (search links generated, no API calls)
 
