@@ -1376,6 +1376,156 @@ app.get('/api/longtail-keywords', async (req, res) => {
   });
 });
 
+// ===== MODULE 2: Competitor Pain Point Analyzer =====
+let painPointCache = {};
+const PAINPOINT_CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
+
+// Pain point categories for rule-based NLP analysis
+const PAINPOINT_PATTERNS = {
+  taste: { keywords: ['taste', 'flavor', 'smell', 'disgusting', 'awful taste', 'chalky', 'bitter', 'nasty', 'gritty', 'horrible taste', 'aftertaste', 'stink', 'gross'], label: 'Taste / Flavor Issues' },
+  efficacy: { keywords: ['doesn\'t work', 'no effect', 'useless', 'waste of money', 'did nothing', 'no difference', 'ineffective', 'snake oil', 'placebo', 'overhyped', 'not effective'], label: 'Efficacy Doubts' },
+  sideEffects: { keywords: ['side effect', 'stomach', 'nausea', 'diarrhea', 'headache', 'rash', 'allergic', 'insomnia', 'anxiety', 'upset stomach', 'cramping', 'bloating', 'heartburn', 'jitter'], label: 'Side Effects' },
+  quality: { keywords: ['fake', 'counterfeit', 'expired', 'contaminated', 'mold', 'broken seal', 'tampered', 'third party', 'heavy metal', 'lead', 'arsenic', 'impure', 'low quality'], label: 'Quality / Purity Concerns' },
+  dosage: { keywords: ['too big', 'hard to swallow', 'pill size', 'horse pill', 'capsule size', 'dosage', 'too many pills', 'serving size', 'underdosed'], label: 'Dosage / Form Problems' },
+  price: { keywords: ['overpriced', 'expensive', 'rip off', 'not worth', 'too expensive', 'cheaper', 'price increase', 'shrinkflation', 'less for more'], label: 'Price / Value' },
+  packaging: { keywords: ['packaging', 'broken', 'leaked', 'damaged', 'bottle', 'seal', 'cap', 'arrived broken', 'melted', 'poor packaging'], label: 'Packaging Issues' },
+  transparency: { keywords: ['proprietary blend', 'hidden ingredients', 'no lab test', 'no certificate', 'misleading', 'false claims', 'label', 'not what advertised'], label: 'Transparency / Trust' }
+};
+
+app.get('/api/painpoint-analysis', async (req, res) => {
+  const category = req.query.category;
+  if (!category) return res.json({ error: 'Category parameter required' });
+
+  const cacheKey = category;
+  if (painPointCache[cacheKey] && Date.now() - painPointCache[cacheKey].time < PAINPOINT_CACHE_TTL) {
+    return res.json(painPointCache[cacheKey].data);
+  }
+
+  try {
+    // Step 1: Get top products from SP-API (via trendsCache)
+    const catData = trendsCache?.categories?.[category];
+    const topProducts = catData?.topProducts?.slice(0, 10) || [];
+    const catName = category.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim().toLowerCase();
+
+    // Step 2: Fetch Reddit posts about this category (search multiple subreddits)
+    const searchQueries = [
+      `${catName} supplement problem`,
+      `${catName} side effects`,
+      `${catName} review`
+    ];
+    const redditPosts = [];
+
+    for (const query of searchQueries) {
+      try {
+        const result = await httpsGet('www.reddit.com',
+          `/search.json?q=${encodeURIComponent(query)}&sort=relevance&limit=25&restrict_sr=false`,
+          { 'User-Agent': 'VitaView/1.0 (supplement market research)' }
+        );
+        const posts = result.data?.data?.children || [];
+        posts.forEach(p => {
+          const d = p.data;
+          if (d && !d.stickied && (d.selftext || d.title)) {
+            redditPosts.push({
+              title: d.title || '',
+              selftext: (d.selftext || '').slice(0, 500),
+              subreddit: d.subreddit,
+              score: d.score || 0,
+              numComments: d.num_comments || 0,
+              url: `https://reddit.com${d.permalink}`,
+              created: new Date((d.created_utc || 0) * 1000).toISOString()
+            });
+          }
+        });
+      } catch(e) {
+        console.log(`Reddit search error for "${query}":`, e.message);
+      }
+      await new Promise(r => setTimeout(r, 1000)); // Reddit rate limit
+    }
+
+    // Deduplicate posts by URL
+    const seen = new Set();
+    const uniquePosts = redditPosts.filter(p => {
+      if (seen.has(p.url)) return false;
+      seen.add(p.url);
+      return true;
+    });
+
+    // Step 3: NLP Pain Point Extraction
+    const painPoints = {};
+    const evidencePosts = {};
+
+    Object.entries(PAINPOINT_PATTERNS).forEach(([key, { keywords, label }]) => {
+      painPoints[key] = { label, count: 0, severity: 0, keywords: [] };
+      evidencePosts[key] = [];
+    });
+
+    uniquePosts.forEach(post => {
+      const text = (post.title + ' ' + post.selftext).toLowerCase();
+      Object.entries(PAINPOINT_PATTERNS).forEach(([key, { keywords }]) => {
+        const matchedKW = keywords.filter(kw => text.includes(kw));
+        if (matchedKW.length > 0) {
+          painPoints[key].count++;
+          painPoints[key].severity += matchedKW.length * (post.score > 10 ? 2 : 1);
+          matchedKW.forEach(kw => {
+            if (!painPoints[key].keywords.includes(kw)) painPoints[key].keywords.push(kw);
+          });
+          if (evidencePosts[key].length < 3) {
+            evidencePosts[key].push({ title: post.title, score: post.score, subreddit: post.subreddit, url: post.url, matchedKeywords: matchedKW });
+          }
+        }
+      });
+    });
+
+    // Rank pain points by severity
+    const rankedPainPoints = Object.entries(painPoints)
+      .map(([key, data]) => ({
+        id: key,
+        ...data,
+        evidence: evidencePosts[key] || [],
+        severityScore: Math.min(100, Math.round(data.severity * 10 / Math.max(1, uniquePosts.length) * 100))
+      }))
+      .filter(p => p.count > 0)
+      .sort((a, b) => b.severity - a.severity);
+
+    // Step 4: Generate improvement suggestions
+    const improvementMap = {
+      taste: { suggestion: 'Develop flavored gummy or softgel version with natural fruit flavoring', productIdea: 'Pleasant-tasting gummy with verified potency' },
+      efficacy: { suggestion: 'Use bioavailable forms (e.g., chelated minerals, liposomal delivery) and provide 3rd-party lab certificates', productIdea: 'High-bioavailability formula with published clinical data' },
+      sideEffects: { suggestion: 'Lower initial dosage, add digestive aids (ginger, peppermint), offer a "gentle" formula', productIdea: 'Gentle-formula supplement with stomach-friendly coating' },
+      quality: { suggestion: 'NSF/USP certification, heavy metal testing, transparent lab reports on product page', productIdea: 'USP-verified, heavy-metal tested premium supplement' },
+      dosage: { suggestion: 'Offer mini capsules, liquid drops, or powder form as alternatives', productIdea: 'Easy-to-swallow mini capsule or liquid drop format' },
+      price: { suggestion: 'Competitive pricing with larger pack sizes, subscribe-and-save discounts', productIdea: 'Value pack (180-day supply) at lower per-serving cost' },
+      packaging: { suggestion: 'Double-sealed glass bottles, improved cushioning in shipping', productIdea: 'Glass bottle with double-seal and travel-friendly packaging' },
+      transparency: { suggestion: 'Full ingredient disclosure, COA (Certificate of Analysis) QR code on every bottle', productIdea: 'Fully transparent label with scannable COA link' }
+    };
+
+    const top3Issues = rankedPainPoints.slice(0, 3).map(p => ({
+      ...p,
+      improvement: improvementMap[p.id] || { suggestion: 'Conduct deeper research', productIdea: 'Improved version addressing this specific concern' }
+    }));
+
+    const responseData = {
+      category,
+      categoryName: catName,
+      topProducts: topProducts.slice(0, 5).map(p => ({ asin: p.asin, title: p.title, brand: p.brand, price: p.price, rank: p.rank })),
+      redditPostsAnalyzed: uniquePosts.length,
+      allPainPoints: rankedPainPoints,
+      top3Issues,
+      newProductIdea: top3Issues.length >= 3 ? {
+        concept: `${catName.charAt(0).toUpperCase() + catName.slice(1)} supplement that solves: ${top3Issues.map(i => i.label).join(', ')}`,
+        features: top3Issues.map(i => i.improvement.suggestion),
+        uniqueSellingPoint: top3Issues[0]?.improvement?.productIdea || 'Superior quality supplement'
+      } : null,
+      timestamp: new Date().toISOString()
+    };
+
+    painPointCache[cacheKey] = { data: responseData, time: Date.now() };
+    res.json(responseData);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 VitaView Backend running on http://localhost:${PORT}`);
   console.log(`📋 Mode: LIVE (SP-API direct HTTP)`);

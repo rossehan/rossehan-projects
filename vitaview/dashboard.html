@@ -347,6 +347,10 @@ function VitaView() {
   const [miFdaIngredient, setMiFdaIngredient] = useState("ashwagandha");
   const [miGoogleTrends, setMiGoogleTrends] = useState(null);
   const [miGoogleTrendsLoading, setMiGoogleTrendsLoading] = useState(false);
+  // Module 2: Pain Point Analysis
+  const [painPointData, setPainPointData] = useState(null);
+  const [painPointLoading, setPainPointLoading] = useState(false);
+  const [painPointCategory, setPainPointCategory] = useState("ashwagandha");
 
   useEffect(() => {
     fetch(`${API_BASE}/api/health`)
@@ -1378,7 +1382,8 @@ function VitaView() {
                 ["youtube", "\u{1F4F9} YouTube"],
                 ["reddit", "\u{1F4AC} Reddit"],
                 ["fda", "\u{1F3E5} FDA Safety"],
-                ["gtrends", "\u{1F4C8} Google Trends"]
+                ["gtrends", "\u{1F4C8} Google Trends"],
+                ["painpoints", "\u{1F6A8} Pain Points"]
               ].map(([id, label]) => (
                 <button key={id} onClick={() => setMiSubTab(id)} style={{
                   background: miSubTab === id ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "#fff",
@@ -1788,6 +1793,185 @@ function VitaView() {
                 ) : <div style={{ color: "#94a3b8", textAlign: "center", padding: 60 }}>No Google Trends data</div>}
               </div>
             )}
+
+            {/* MODULE 2: PAIN POINT ANALYSIS SUB-TAB */}
+            {miSubTab === "painpoints" && (
+              <div>
+                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 24, marginBottom: 20 }}>
+                  <h3 style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>{"\u{1F6A8}"} Competitor Pain Point Analyzer</h3>
+                  <p style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>Reddit 커뮤니티 데이터 기반 경쟁 제품 약점 분석 &amp; 신제품 기회 도출</p>
+
+                  <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                    <select value={painPointCategory} onChange={e => setPainPointCategory(e.target.value)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, minWidth: 200 }}>
+                      {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+                    </select>
+                    <button onClick={() => {
+                      setPainPointData(null);
+                      setPainPointLoading(true);
+                      fetch(`${API_BASE}/api/painpoint-analysis?category=${painPointCategory}`)
+                        .then(r => r.json()).then(d => { if (!d.error) setPainPointData(d); })
+                        .catch(() => {}).finally(() => setPainPointLoading(false));
+                    }} style={{ background: "linear-gradient(135deg, #ef4444, #f97316)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                      {painPointLoading ? "Analyzing..." : "\u{1F50D} Analyze Pain Points"}
+                    </button>
+                  </div>
+                </div>
+
+                {painPointLoading && (
+                  <div style={{ textAlign: "center", padding: 60 }}>
+                    <div style={{ width: 40, height: 40, border: "3px solid rgba(239,68,68,0.2)", borderTopColor: "#ef4444", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
+                    <div style={{ color: "#64748b" }}>Reddit 데이터 수집 &amp; 분석 중... (약 5-10초 소요)</div>
+                  </div>
+                )}
+
+                {painPointData && !painPointLoading && (
+                  <div>
+                    {/* Summary stats */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 20 }}>
+                      <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: 16, textAlign: "center" }}>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: "#ef4444" }}>{painPointData.redditPostsAnalyzed}</div>
+                        <div style={{ fontSize: 12, color: "#dc2626" }}>Reddit Posts Analyzed</div>
+                      </div>
+                      <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 12, padding: 16, textAlign: "center" }}>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: "#f97316" }}>{painPointData.allPainPoints?.length || 0}</div>
+                        <div style={{ fontSize: 12, color: "#ea580c" }}>Pain Point Categories Found</div>
+                      </div>
+                      <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 12, padding: 16, textAlign: "center" }}>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: "#10b981" }}>{painPointData.topProducts?.length || 0}</div>
+                        <div style={{ fontSize: 12, color: "#059669" }}>Top Competitors Tracked</div>
+                      </div>
+                    </div>
+
+                    {/* Top 3 Critical Issues */}
+                    {painPointData.top3Issues?.length > 0 && (
+                      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 20 }}>
+                        <h4 style={{ fontSize: 15, fontWeight: 700, color: "#dc2626", marginBottom: 14 }}>{"\u{1F6A8}"} Top {painPointData.top3Issues.length} Critical Pain Points</h4>
+                        {painPointData.top3Issues.map((issue, i) => (
+                          <div key={i} style={{ background: i === 0 ? "#fef2f2" : "#f8fafc", border: `1px solid ${i === 0 ? "#fecaca" : "#e2e8f0"}`, borderRadius: 12, padding: 16, marginBottom: 12 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                              <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>
+                                #{i + 1} {issue.label}
+                              </div>
+                              <div style={{ display: "flex", gap: 8 }}>
+                                <span style={{ background: "#fef2f2", color: "#dc2626", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
+                                  {issue.count} mentions
+                                </span>
+                                <span style={{ background: issue.severityScore >= 50 ? "#fef2f2" : "#fff7ed", color: issue.severityScore >= 50 ? "#dc2626" : "#ea580c", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
+                                  Severity: {issue.severityScore}/100
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Matched keywords */}
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                              {issue.keywords?.slice(0, 8).map((kw, j) => (
+                                <span key={j} style={{ background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: 6, fontSize: 11 }}>{kw}</span>
+                              ))}
+                            </div>
+
+                            {/* Improvement suggestion */}
+                            <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 8, padding: 12, marginBottom: 10 }}>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: "#059669", marginBottom: 4 }}>Improvement Strategy:</div>
+                              <div style={{ fontSize: 12, color: "#064e3b" }}>{issue.improvement?.suggestion}</div>
+                            </div>
+
+                            {/* Evidence posts */}
+                            {issue.evidence?.length > 0 && (
+                              <div>
+                                <div style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", marginBottom: 6 }}>Evidence from Reddit:</div>
+                                {issue.evidence.map((ev, j) => (
+                                  <div key={j} style={{ fontSize: 11, color: "#64748b", marginBottom: 4, paddingLeft: 12, borderLeft: "2px solid #e2e8f0" }}>
+                                    <a href={ev.url} target="_blank" rel="noopener noreferrer" style={{ color: "#3b82f6", textDecoration: "none" }}>{ev.title?.slice(0, 80)}</a>
+                                    <span style={{ color: "#94a3b8" }}> (r/{ev.subreddit}, score: {ev.score})</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* New Product Idea */}
+                    {painPointData.newProductIdea && (
+                      <div style={{ background: "linear-gradient(135deg, #0f172a, #1e293b)", borderRadius: 14, padding: 24, marginBottom: 20, color: "#fff" }}>
+                        <h4 style={{ fontSize: 16, fontWeight: 700, color: "#a7f3d0", marginBottom: 12 }}>{"\u{1F4A1}"} AI-Generated New Product Idea</h4>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: "#fff", marginBottom: 12 }}>{painPointData.newProductIdea.concept}</div>
+                        <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 8 }}>Key Features:</div>
+                        <ul style={{ margin: 0, paddingLeft: 20 }}>
+                          {painPointData.newProductIdea.features?.map((f, i) => (
+                            <li key={i} style={{ fontSize: 12, color: "#e2e8f0", marginBottom: 4 }}>{f}</li>
+                          ))}
+                        </ul>
+                        <div style={{ marginTop: 12, background: "#10b981", display: "inline-block", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600 }}>
+                          USP: {painPointData.newProductIdea.uniqueSellingPoint}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* All Pain Points Table */}
+                    {painPointData.allPainPoints?.length > 0 && (
+                      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 20 }}>
+                        <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>All Detected Pain Points</h4>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                          <thead>
+                            <tr style={{ background: "#f8fafc" }}>
+                              <th style={{ padding: "8px 10px", textAlign: "left", color: "#64748b" }}>Category</th>
+                              <th style={{ padding: "8px 10px", textAlign: "center", color: "#64748b" }}>Mentions</th>
+                              <th style={{ padding: "8px 10px", textAlign: "center", color: "#64748b" }}>Severity</th>
+                              <th style={{ padding: "8px 10px", textAlign: "left", color: "#64748b" }}>Keywords</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {painPointData.allPainPoints.map((p, i) => (
+                              <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                                <td style={{ padding: "8px 10px", fontWeight: 600, color: "#0f172a" }}>{p.label}</td>
+                                <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                                  <span style={{ background: "#fef2f2", color: "#dc2626", padding: "2px 8px", borderRadius: 10, fontWeight: 600 }}>{p.count}</span>
+                                </td>
+                                <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                                  <div style={{ width: 60, height: 6, background: "#f1f5f9", borderRadius: 3, display: "inline-block", position: "relative" }}>
+                                    <div style={{ width: `${p.severityScore}%`, height: "100%", background: p.severityScore >= 50 ? "#ef4444" : p.severityScore >= 25 ? "#f97316" : "#eab308", borderRadius: 3 }} />
+                                  </div>
+                                  <span style={{ fontSize: 10, color: "#94a3b8", marginLeft: 4 }}>{p.severityScore}</span>
+                                </td>
+                                <td style={{ padding: "8px 10px", color: "#64748b", fontSize: 11 }}>{p.keywords?.slice(0, 4).join(", ")}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {/* Top Competitors */}
+                    {painPointData.topProducts?.length > 0 && (
+                      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20 }}>
+                        <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>Top Competitors in {painPointData.categoryName}</h4>
+                        {painPointData.topProducts.map((p, i) => (
+                          <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < painPointData.topProducts.length - 1 ? "1px solid #f1f5f9" : "none" }}>
+                            <div>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>#{i + 1} {p.title?.slice(0, 60)}</div>
+                              <div style={{ fontSize: 11, color: "#94a3b8" }}>{p.brand} | ASIN: {p.asin}</div>
+                            </div>
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontSize: 13, fontWeight: 700, color: "#10b981" }}>${p.price?.toFixed(2)}</div>
+                              <div style={{ fontSize: 10, color: "#94a3b8" }}>Rank #{p.rank?.toLocaleString()}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {painPointData.allPainPoints?.length === 0 && (
+                      <div style={{ textAlign: "center", padding: 40, color: "#94a3b8" }}>
+                        <p>No pain points found in Reddit data for this category. Try a more popular supplement.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
           </div>
         )}
 
