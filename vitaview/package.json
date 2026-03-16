@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "vitaview-backend",
   "version": "1.0.0",
   "description": "VitaView Amazon SP-API Backend",
@@ -7,8 +7,11 @@
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
+    "better-sqlite3": "^12.8.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.0"
+    "dotenv": "^16.3.0",
+    "express": "^4.18.2",
+    "google-trends-api": "^4.9.2",
+    "node-cron": "^4.2.1"
   }
 }

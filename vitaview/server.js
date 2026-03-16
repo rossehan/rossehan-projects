@@ -3,6 +3,15 @@ const express = require('express');
 const cors = require('cors');
 const https = require('https');
 const querystring = require('querystring');
+const cron = require('node-cron');
+
+// [VitaView v2] SQLite DB import
+const {
+  db, saveTrendSnapshot, getLastTrendSnapshot, saveCategoryRanking,
+  getEmergingKeywords, upsertEmergingKeyword, upsertCompetitorProduct,
+  saveFDASignal, getFDASignal, saveSearchDemandSnapshot, calculateBSRTrend,
+  runTransaction
+} = require('./db');
 
 const path = require('path');
 const app = express();
@@ -763,6 +772,97 @@ let googleTrendsCache = null;
 let googleTrendsCacheTime = 0;
 const GOOGLE_TRENDS_CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
+// [VitaView v2] Google Trends - npm 패키지 기반 안정화 함수
+const googleTrends = require('google-trends-api');
+
+async function getGoogleTrendsData(keyword) {
+  try {
+    const result = await googleTrends.interestOverTime({
+      keyword: keyword,
+      startTime: new Date(Date.now() - (180 * 24 * 60 * 60 * 1000)),
+      hl: 'en-US',
+      geo: 'US'
+    });
+
+    const parsed = JSON.parse(result);
+    const timelineData = parsed.default.timelineData;
+
+    const recent3m = timelineData.slice(-13).map(d => d.value[0]);
+    const prev3m = timelineData.slice(-26, -13).map(d => d.value[0]);
+
+    const recent3mAvg = recent3m.reduce((a, b) => a + b, 0) / recent3m.length;
+    const prev3mAvg = prev3m.reduce((a, b) => a + b, 0) / prev3m.length;
+    const growthRate = prev3mAvg > 0 ? ((recent3mAvg - prev3mAvg) / prev3mAvg) * 100 : 0;
+
+    // [VitaView v2] DB에 저장
+    try {
+      saveTrendSnapshot({
+        keyword, category: 'google_trends',
+        google_trends_value: recent3m[recent3m.length - 1],
+        google_trends_3m_avg: recent3mAvg,
+        google_trends_prev_3m_avg: prev3mAvg,
+        trend_growth_rate: growthRate,
+        opportunity_score: 0, verdict: ''
+      });
+    } catch(e) { /* DB 저장 실패 무시 */ }
+
+    return {
+      currentValue: recent3m[recent3m.length - 1],
+      recent3mAvg, prev3mAvg, growthRate,
+      isRising: growthRate > 0,
+      rawData: timelineData
+    };
+  } catch (error) {
+    // [VitaView v2] 실패 시 DB에서 마지막 저장 데이터 fallback
+    const lastSnapshot = getLastTrendSnapshot(keyword);
+    if (lastSnapshot) {
+      return {
+        currentValue: lastSnapshot.google_trends_value,
+        recent3mAvg: lastSnapshot.google_trends_3m_avg,
+        growthRate: lastSnapshot.trend_growth_rate,
+        isRising: lastSnapshot.trend_growth_rate > 0,
+        fromCache: true,
+        cacheDate: lastSnapshot.created_at
+      };
+    }
+    throw error;
+  }
+}
+
+// [VitaView v2] 데이터 신뢰도 계산
+function calculateDataConfidence(data) {
+  const signals = {
+    googleTrends: { available: !!data.trends, fromCache: data.trends?.fromCache || false, sampleSize: data.trends?.rawData?.length || 0, weight: 0.25 },
+    reddit: { available: !!data.reddit, sampleSize: data.reddit?.mentionCount || 0, sufficient: (data.reddit?.mentionCount || 0) >= 20, weight: 0.25 },
+    youtube: { available: !!data.youtube, sampleSize: data.youtube?.videoCount || 0, sufficient: (data.youtube?.videoCount || 0) >= 5, weight: 0.20 },
+    amazonBSR: { available: !!data.bsr, weight: 0.20 },
+    patents: { available: !!data.patents, weight: 0.10 }
+  };
+
+  let confidenceScore = 0;
+  const warnings = [];
+
+  Object.entries(signals).forEach(([source, info]) => {
+    if (!info.available) {
+      warnings.push(`${source} 데이터 없음 - 해당 항목 점수 제외됨`);
+    } else if (info.fromCache) {
+      confidenceScore += info.weight * 0.5;
+      warnings.push(`${source} 캐시 데이터 사용 중`);
+    } else if (info.sufficient === false) {
+      confidenceScore += info.weight * 0.6;
+      warnings.push(`${source} 샘플 부족 (${info.sampleSize}개) - 신뢰도 낮음`);
+    } else {
+      confidenceScore += info.weight;
+    }
+  });
+
+  return {
+    score: Math.round(confidenceScore * 100),
+    level: confidenceScore >= 0.8 ? '높음' : confidenceScore >= 0.5 ? '보통' : '낮음',
+    warnings
+  };
+}
+
 app.get('/api/market-intel/google-trends', async (req, res) => {
   if (googleTrendsCache && Date.now() - googleTrendsCacheTime < GOOGLE_TRENDS_CACHE_TTL) {
     return res.json(googleTrendsCache);
@@ -1359,105 +1459,7 @@ app.get('/api/amazon-suggest', async (req, res) => {
   }
 });
 
-app.get('/api/longtail-keywords', async (req, res) => {
-  // Use trendsCache to get main keywords from SP-API categories
-  if (!trendsCache) {
-    return res.json({ error: 'Trends data not loaded yet. Please wait for initial data fetch.', keywords: {} });
-  }
-
-  const requestedCategory = req.query.category; // optional: specific category
-  const categories = trendsCache.categories || {};
-  const categoryIds = requestedCategory ? [requestedCategory] : Object.keys(categories).slice(0, 20); // limit to 20 at a time
-
-  const results = {};
-  for (const catId of categoryIds) {
-    const catData = categories[catId];
-    if (!catData) continue;
-
-    // Build seed keywords from category name + top product titles
-    const seedKeywords = [];
-    // Category name itself (convert id to search term)
-    const catName = catId.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim().toLowerCase();
-    seedKeywords.push(catName + ' supplement');
-
-    // Extract top brand keywords
-    if (catData.topProducts?.length > 0) {
-      // Get unique meaningful words from top 3 product titles
-      const topTitles = catData.topProducts.slice(0, 3).map(p => p.title || '');
-      const commonWords = new Set(['the','a','an','and','or','for','with','in','of','to','by','is','mg','ct','count','pack','capsules','tablets','softgels','gummies','supplement','supply','day','days','month','serving','servings','size','made','usa','non','gmo','free','gluten','vegan','organic','natural','premium','best']);
-      const titleWords = topTitles.join(' ').toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 3 && !commonWords.has(w));
-      const wordFreq = {};
-      titleWords.forEach(w => { wordFreq[w] = (wordFreq[w] || 0) + 1; });
-      const topWords = Object.entries(wordFreq).sort((a, b) => b[1] - a[1]).slice(0, 3).map(e => e[0]);
-      topWords.forEach(w => {
-        if (w !== catName) seedKeywords.push(w + ' supplement');
-      });
-    }
-
-    // Fetch Amazon autocomplete for each seed keyword
-    const longtailKeywords = [];
-    for (const seed of seedKeywords.slice(0, 4)) { // max 4 seeds per category
-      const cacheKey = seed;
-      let suggestions = [];
-
-      if (amazonSuggestCache[cacheKey] && Date.now() - amazonSuggestCache[cacheKey].time < AMAZON_SUGGEST_CACHE_TTL) {
-        suggestions = amazonSuggestCache[cacheKey].data.suggestions || [];
-      } else {
-        try {
-          const result = await httpsGet(
-            'completion.amazon.com',
-            `/search/complete?search-alias=aps&client=amazon-search-ui&mkt=1&q=${encodeURIComponent(seed)}`,
-            {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Accept': 'application/json, text/javascript, */*',
-              'Accept-Language': 'en-US,en;q=0.9',
-              'Accept-Encoding': 'identity',
-              'Referer': 'https://www.amazon.com/',
-              'Origin': 'https://www.amazon.com'
-            }
-          );
-          if (Array.isArray(result.data)) {
-            suggestions = result.data[1] || [];
-          } else if (typeof result.data === 'string') {
-            try { const parsed = JSON.parse(result.data); suggestions = Array.isArray(parsed) ? (parsed[1] || []) : []; } catch(e) {}
-          }
-          if (suggestions.length > 0) {
-            amazonSuggestCache[cacheKey] = { data: { query: seed, suggestions }, time: Date.now() };
-          }
-        } catch(e) {
-          console.log(`Amazon suggest error for "${seed}":`, e.message);
-        }
-        // Rate limit: 500ms between requests
-        await new Promise(r => setTimeout(r, 500));
-      }
-
-      suggestions.forEach(s => {
-        if (!longtailKeywords.find(k => k.keyword === s)) {
-          longtailKeywords.push({
-            keyword: s,
-            seed,
-            wordCount: s.split(/\s+/).length,
-            isLongTail: s.split(/\s+/).length >= 3
-          });
-        }
-      });
-    }
-
-    results[catId] = {
-      categoryName: catName,
-      seedKeywords,
-      longtailKeywords: longtailKeywords.sort((a, b) => b.wordCount - a.wordCount),
-      totalFound: longtailKeywords.length,
-      longTailCount: longtailKeywords.filter(k => k.isLongTail).length
-    };
-  }
-
-  res.json({
-    keywords: results,
-    totalCategories: Object.keys(results).length,
-    timestamp: new Date().toISOString()
-  });
-});
+// [VitaView v2] /api/longtail-keywords 삭제됨 - Keyword Intelligence 탭이 키워드 분석 담당
 
 // ===== MODULE 2: Competitor Pain Point Analyzer =====
 let painPointCache = {};
@@ -1609,114 +1611,120 @@ app.get('/api/painpoint-analysis', async (req, res) => {
   }
 });
 
-// ===== MODULE 3: Entry Barrier & Legal Risk Checker =====
+// [VitaView v2] Legal Barrier - 실제 작동하도록 수정
 app.get('/api/legal-barrier', async (req, res) => {
-  const category = req.query.category;
-  if (!category) return res.json({ error: 'Category parameter required' });
+  const keyword = req.query.keyword || req.query.category;
+  if (!keyword) return res.status(400).json({ error: 'keyword 파라미터 필요' });
 
-  const catData = trendsCache?.categories?.[category];
-  if (!catData) return res.json({ error: 'Category data not found. Load trends first.' });
+  try {
+    // trendsCache에서 카테고리 데이터 가져오기 (기존 하위호환)
+    const catData = trendsCache?.categories?.[keyword];
+    const catName = keyword.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim().toLowerCase();
+    const searchTerm = CATEGORY_KEYWORDS[keyword] || catName;
 
-  const catName = category.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim().toLowerCase();
-  const searchTerm = CATEGORY_KEYWORDS[category] || catName;
+    let hhi = null, topBrands = [], brandCount = 0, topBrandShare = 0, totalProducts = 0;
 
-  // 1. Brand Concentration Analysis (from SP-API data)
-  const brands = catData.brands || {};
-  const brandEntries = Object.entries(brands).sort((a, b) => b[1].count - a[1].count);
-  const totalProducts = catData.totalProducts || brandEntries.reduce((s, [, d]) => s + d.count, 0);
-  const topBrand = brandEntries[0];
-  const topBrandShare = topBrand ? Math.round(topBrand[1].count / totalProducts * 100) : 0;
-  const top3Share = brandEntries.slice(0, 3).reduce((s, [, d]) => s + d.count, 0) / Math.max(1, totalProducts) * 100;
-  const brandCount = brandEntries.length;
-  const hhi = catData.hhi || 0;
+    if (catData) {
+      // SP-API 데이터 있는 경우
+      const brands = catData.brands || {};
+      const brandEntries = Object.entries(brands).sort((a, b) => b[1].revenue - a[1].revenue);
+      totalProducts = catData.totalProducts || brandEntries.reduce((s, [, d]) => s + d.count, 0);
+      brandCount = brandEntries.length;
+      hhi = catData.hhi || 0;
+      topBrandShare = catData.topBrandShare || 0;
+      topBrands = brandEntries.slice(0, 5).map(([name, data]) => ({
+        name, productCount: data.count,
+        marketShare: Math.round(data.count / Math.max(1, totalProducts) * 100),
+        estimatedRevenue: data.revenue || 0
+      }));
+    }
 
-  // 2. Trademark density estimation based on brand count
-  const trademarkDensity = Math.min(100, Math.round(brandCount * 2));
+    // 특허 검색 링크 (직접 외부 링크 제공)
+    const usptoUrl = `https://patents.google.com/?q=${encodeURIComponent(searchTerm + ' supplement')}&country=US&status=GRANT`;
+    const googlePatentUrl = `https://patents.google.com/?q=${encodeURIComponent(searchTerm)}&before=priority:20240101`;
 
-  // [VitaView Fix] 3. Legal barrier score calculation
-  // High HHI = monopolistic = harder to enter (barrierScore 높을수록 진입 어려움)
-  // High top brand share = dominant player = harder
-  // Few brands = consolidated market = harder
-  const hhiScore = Math.min(100, Math.round(hhi / 100)); // 0-100, 높을수록 독점적
-  const dominanceScore = Math.min(100, Math.round(topBrandShare * 1.5));
-  const consolidationScore = brandCount < 5 ? 90 : brandCount < 10 ? 70 : brandCount < 20 ? 50 : brandCount < 30 ? 30 : 10;
-  const barrierScore = Math.round(hhiScore * 0.35 + dominanceScore * 0.35 + consolidationScore * 0.3);
+    let entryDifficulty = 'LOW';
+    const entryReasons = [];
 
-  // [VitaView Fix] Opportunity Score도 함께 계산 (문제 2 - 진입 기회 점수)
-  const opportunityResult = calculateOpportunityScore(
-    { catId: category, hhi, brandCount, topShare: topBrandShare, topBrandShare, topProducts: catData.topProducts || [] },
-    {} // barrier endpoint에서는 빠른 점수만
-  );
+    if (hhi !== null) {
+      if (hhi > 2500) {
+        entryDifficulty = 'VERY_HIGH';
+        entryReasons.push('시장이 소수 브랜드에 완전히 집중됨 (HHI > 2500)');
+      } else if (hhi > 1800) {
+        entryDifficulty = 'HIGH';
+        entryReasons.push('상위 브랜드 점유율 높음 (HHI > 1800)');
+      } else if (hhi > 1000) {
+        entryDifficulty = 'MEDIUM';
+        entryReasons.push('경쟁 있지만 진입 가능한 수준 (HHI 1000~1800)');
+      } else {
+        entryDifficulty = 'LOW';
+        entryReasons.push('시장 분산, 신규 진입 유리 (HHI < 1000)');
+      }
+    } else {
+      entryReasons.push('SP-API 데이터 없음 - 먼저 trends 데이터를 로드하세요');
+    }
 
-  // 4. Risk level determination
-  let riskLevel, riskColor, riskAdvice;
-  if (barrierScore >= 70) {
-    riskLevel = 'HIGH';
-    riskColor = '#ef4444';
-    riskAdvice = 'This market has high entry barriers. Dominant brands may have strong trademark protection. Consider differentiating with unique formulation or targeting underserved sub-niches.';
-  } else if (barrierScore >= 40) {
-    riskLevel = 'MEDIUM';
-    riskColor = '#f59e0b';
-    riskAdvice = 'Moderate competition. Some established brands but room for new entrants. Check trademarks before choosing brand name.';
-  } else {
-    riskLevel = 'LOW';
-    riskColor = '#10b981';
-    riskAdvice = 'Fragmented market with low barriers. Good opportunity for new brands. Few dominant players to worry about.';
+    // Opportunity Score도 함께 계산
+    let opportunityData = null;
+    if (catData) {
+      opportunityData = calculateOpportunityScore(
+        { catId: keyword, hhi, brandCount, topShare: topBrandShare, topBrandShare, topProducts: catData.topProducts || [] },
+        {}
+      );
+    }
+
+    // Brand landscape (기존 하위호환)
+    const brands = catData?.brands || {};
+    const brandEntries = Object.entries(brands).sort((a, b) => b[1].count - a[1].count);
+    const weakBrands = brandEntries.filter(([, d]) => d.count <= 2);
+    const strongBrands = brandEntries.filter(([, d]) => d.count >= 5);
+    const brandLandscape = brandEntries.slice(0, 15).map(([name, data]) => ({
+      name, productCount: data.count,
+      marketShare: Math.round(data.count / Math.max(1, totalProducts) * 100),
+      estimatedRevenue: data.revenue || 0,
+      potentialTrademark: data.count >= 3
+    }));
+
+    res.json({
+      keyword,
+      category: keyword,
+      categoryName: catName,
+      entryDifficulty, entryReasons, hhi,
+      topBrands: topBrands.slice(0, 5),
+      patentLinks: { uspto: usptoUrl, googlePatents: googlePatentUrl },
+      // 기존 하위호환 필드
+      barrierScore: entryDifficulty === 'VERY_HIGH' ? 90 : entryDifficulty === 'HIGH' ? 70 : entryDifficulty === 'MEDIUM' ? 50 : 25,
+      riskLevel: entryDifficulty === 'VERY_HIGH' ? 'HIGH' : entryDifficulty,
+      riskColor: entryDifficulty === 'VERY_HIGH' || entryDifficulty === 'HIGH' ? '#ef4444' : entryDifficulty === 'MEDIUM' ? '#f59e0b' : '#10b981',
+      riskAdvice: entryReasons[0] || '',
+      opportunityScore: opportunityData?.opportunityScore || null,
+      opportunityVerdict: opportunityData?.verdict || null,
+      opportunityBreakdown: opportunityData?.scoreBreakdown || null,
+      metrics: {
+        hhi: hhi || 0,
+        topBrandShare,
+        brandCount,
+        totalProducts
+      },
+      brandLandscape,
+      opportunities: {
+        weakBrandsCount: weakBrands.length,
+        strongBrandsCount: strongBrands.length,
+        fragmentationRatio: Math.round(weakBrands.length / Math.max(1, brandEntries.length) * 100),
+        isFragmented: weakBrands.length > strongBrands.length * 2
+      },
+      searchLinks: {
+        usptoTess: `https://tmsearch.uspto.gov/bin/gate.exe?f=searchss&state=4801:1.1.1&p_s_PARA1=${encodeURIComponent(searchTerm)}`,
+        googlePatents: googlePatentUrl,
+        usptoSearch: 'https://www.uspto.gov/trademarks/search',
+        alibabaSearch: `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(searchTerm)}`
+      },
+      checkedAt: new Date().toISOString(),
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  // 5. Generate search links for manual verification
-  const searchLinks = {
-    usptoTess: `https://tmsearch.uspto.gov/bin/gate.exe?f=searchss&state=4801:1.1.1&p_s_PARA1=${encodeURIComponent(searchTerm)}&p_s_PARA2=&p_s_ParaOperator=AND&p_s_ALL=&BackReference=&p_L=50&p_plural=yes&p_s_ALL=&a_default=search&a_search=Submit+Query`,
-    googlePatents: `https://patents.google.com/?q=${encodeURIComponent(searchTerm + ' supplement')}&oq=${encodeURIComponent(searchTerm)}`,
-    usptoSearch: `https://www.uspto.gov/trademarks/search`,
-    alibabaSearch: `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(searchTerm)}`
-  };
-
-  // 6. Brand landscape analysis
-  const brandLandscape = brandEntries.slice(0, 15).map(([name, data]) => ({
-    name,
-    productCount: data.count,
-    marketShare: Math.round(data.count / totalProducts * 100),
-    estimatedRevenue: data.revenue || 0,
-    potentialTrademark: data.count >= 3 // likely has trademark if 3+ products
-  }));
-
-  // Count "dead zone" opportunities - brands with low share
-  const weakBrands = brandEntries.filter(([, d]) => d.count <= 2);
-  const strongBrands = brandEntries.filter(([, d]) => d.count >= 5);
-
-  res.json({
-    category,
-    categoryName: catName,
-    barrierScore,
-    riskLevel,
-    riskColor,
-    riskAdvice,
-    // [VitaView Fix] Opportunity Score 추가 (문제 2)
-    opportunityScore: opportunityResult.opportunityScore,
-    opportunityVerdict: opportunityResult.verdict,
-    opportunityBreakdown: opportunityResult.scoreBreakdown,
-    metrics: {
-      hhi,
-      hhiScore,
-      hhiInterpretation: hhi < 1000 ? '분산된 시장 (진입 용이)' : hhi <= 1800 ? '보통' : hhi <= 2500 ? '집중된 시장' : '독점 시장 (진입 불가)',
-      topBrandShare,
-      dominanceScore,
-      brandCount,
-      consolidationScore,
-      totalProducts,
-      top3Share: Math.round(top3Share)
-    },
-    brandLandscape,
-    opportunities: {
-      weakBrandsCount: weakBrands.length,
-      strongBrandsCount: strongBrands.length,
-      fragmentationRatio: Math.round(weakBrands.length / Math.max(1, brandEntries.length) * 100),
-      isFragmented: weakBrands.length > strongBrands.length * 2
-    },
-    searchLinks,
-    timestamp: new Date().toISOString()
-  });
 });
 
 // ===== MODULE 4: 1/3 Rule Margin Calculator =====
@@ -2204,11 +2212,32 @@ app.get('/api/opportunity-score', async (req, res) => {
     scoreResult.blockedReasons = blockedReasons;
   }
 
+  // [VitaView v2] 데이터 신뢰도 + AI 전략 분석 추가
+  const dataConfidence = calculateDataConfidence({
+    trends: googleTrendsData?.available ? googleTrendsData : null,
+    reddit: redditSentiment?.available ? { mentionCount: redditSentiment.postsAnalyzed || 0 } : null,
+    youtube: demandSignals.youtube?.available ? { videoCount: demandSignals.youtube.videoCount || 0 } : null,
+    bsr: catData ? true : null,
+    patents: null
+  });
+
+  let aiStrategy = null;
+  try {
+    aiStrategy = await getGeminiStrategyAnalysis(keyword, {
+      hhi: catData.hhi, opportunityScore: scoreResult.opportunityScore,
+      trendGrowthRate: googleTrendsData?.growthRate,
+      redditNegativeRatio: redditSentiment?.negativeRatio,
+      estimatedMargin: catData.avgPrice ? Math.round(catData.avgPrice * 0.34) : null
+    });
+  } catch(e) { /* Gemini 실패 무시 */ }
+
   res.json({
     category,
     categoryName: keyword,
     ...scoreResult,
     bsrVolatility: calculateBSRVolatility(category),
+    dataConfidence,
+    aiStrategy,
     dataFreshness: new Date().toISOString()
   });
 });
@@ -2561,6 +2590,13 @@ ${considerationList ? `특히 다음 사항을 우선적으로 고려해: ${cons
           enrichedWithOpportunityScore: Object.keys(enrichedScores).length,
           blockedByFilter: blockedCategories.length
         },
+        // [VitaView v2] 데이터 신뢰도
+        dataConfidence: calculateDataConfidence({
+          trends: null, reddit: redditData.topPosts?.length > 0 ? { mentionCount: redditData.topPosts.length } : null,
+          youtube: null, bsr: trendsCache ? true : null, patents: null
+        }),
+        // [VitaView v2] AI 추정값 명시
+        aiDisclaimer: 'ROI, 예상 매출, 점유율 등 수치는 AI 추정값이며 실제 결과와 다를 수 있습니다.',
         dataFreshness: new Date().toISOString(),
         timestamp: new Date().toISOString()
       });
@@ -2940,9 +2976,414 @@ ${JSON.stringify(contextData.marginData, null, 2)}
   }
 });
 
+// ═══════════════════════════════════════════════════════════
+// [VitaView v2] 작업 3: 카테고리 비교 API
+// ═══════════════════════════════════════════════════════════
+
+// GET /api/compare?keywords=omega3,magnesium,collagen
+app.get('/api/compare', async (req, res) => {
+  const keywordsParam = req.query.keywords;
+  if (!keywordsParam) return res.status(400).json({ error: 'keywords 파라미터 필요 (콤마 구분)' });
+  const keywords = keywordsParam.split(',').map(k => k.trim());
+  if (keywords.length > 10) {
+    return res.status(400).json({ error: '최대 10개 키워드까지 비교 가능합니다.' });
+  }
+
+  try {
+    const results = await Promise.allSettled(
+      keywords.map(async keyword => {
+        // trendsCache에서 매칭 카테고리 찾기
+        const catId = Object.keys(CATEGORY_KEYWORDS).find(k =>
+          k.toLowerCase() === keyword.toLowerCase() ||
+          CATEGORY_KEYWORDS[k].toLowerCase().includes(keyword.toLowerCase())
+        ) || keyword;
+        const catData = trendsCache?.categories?.[catId];
+        if (!catData) return { keyword, opportunityScore: null, error: 'Category not found' };
+
+        const scoreResult = calculateOpportunityScore(
+          { catId, hhi: catData.hhi, brandCount: catData.brandCount || Object.keys(catData.brands || {}).length,
+            topShare: catData.topBrandShare, topBrandShare: catData.topBrandShare, topProducts: catData.topProducts || [] },
+          {}
+        );
+        return { keyword, ...scoreResult, hhi: catData.hhi, brandCount: catData.brandCount, avgPrice: catData.avgPrice, revenue: catData.estimatedMonthlyRevenue };
+      })
+    );
+
+    const ranked = results
+      .map((result, i) => ({
+        keyword: keywords[i],
+        ...(result.status === 'fulfilled' ? result.value : { error: result.reason?.message, opportunityScore: null })
+      }))
+      .sort((a, b) => (b.opportunityScore || 0) - (a.opportunityScore || 0))
+      .map((item, index) => ({ ...item, rank: index + 1 }));
+
+    // DB 저장
+    const today = new Date().toISOString().split('T')[0];
+    try {
+      runTransaction(() => {
+        ranked.forEach((item, index) => {
+          if (item.opportunityScore !== null) {
+            saveCategoryRanking({
+              category: 'comparison', keyword: item.keyword,
+              opportunity_score: item.opportunityScore, rank_position: index + 1,
+              score_breakdown: item.scoreBreakdown, snapshot_date: today
+            });
+          }
+        });
+      });
+    } catch(e) { /* DB 저장 실패 무시 */ }
+
+    // 데이터 신뢰도 추가
+    const dataConfidence = calculateDataConfidence({
+      trends: null, reddit: null, youtube: null,
+      bsr: trendsCache ? true : null, patents: null
+    });
+
+    res.json({
+      comparedAt: new Date().toISOString(),
+      totalCompared: keywords.length,
+      winner: ranked[0],
+      rankings: ranked,
+      dataConfidence
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/compare/history?days=30
+app.get('/api/compare/history', (req, res) => {
+  const { days = 30 } = req.query;
+  const history = db.prepare(`
+    SELECT * FROM category_rankings
+    WHERE snapshot_date > date('now', '-' || ? || ' days')
+    ORDER BY snapshot_date DESC, rank_position ASC
+  `).all(days);
+  res.json({ periodDays: days, history });
+});
+
+// ═══════════════════════════════════════════════════════════
+// [VitaView v2] 작업 5: 신흥 키워드 자동 감지
+// ═══════════════════════════════════════════════════════════
+
+const BASE_CATEGORIES = [
+  'supplements', 'vitamins', 'protein', 'collagen', 'probiotics',
+  'omega3', 'magnesium', 'vitamin d', 'creatine', 'ashwagandha',
+  'turmeric', 'melatonin', 'zinc', 'iron supplement', 'b12'
+];
+
+async function detectEmergingKeywords() {
+  const emerging = [];
+
+  for (const baseKeyword of BASE_CATEGORIES) {
+    try {
+      // Google Suggestions 활용
+      const sgRes = await httpsGet('suggestqueries.google.com',
+        `/complete/search?client=firefox&q=${encodeURIComponent(baseKeyword + ' supplement')}`,
+        { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+      );
+      const suggestions = Array.isArray(sgRes.data) ? sgRes.data[1] || [] : [];
+
+      for (const suggestion of suggestions.slice(0, 5)) {
+        try {
+          // Reddit에서 언급 빈도 확인
+          const redditRes = await httpsGet('www.reddit.com',
+            `/search.json?q=${encodeURIComponent(suggestion)}&sort=new&t=week&limit=10`,
+            { 'User-Agent': 'VitaView/1.0 (supplement research)' }
+          );
+          const posts = redditRes.data?.data?.children || [];
+          const currentVelocity = posts.length;
+
+          const result = upsertEmergingKeyword({ keyword: suggestion, mention_velocity: currentVelocity, source: 'reddit' });
+
+          if (currentVelocity > 5) {
+            emerging.push({ keyword: suggestion, status: 'new', velocity: currentVelocity });
+          }
+        } catch(e) { /* skip */ }
+        await new Promise(r => setTimeout(r, 500));
+      }
+    } catch(e) { /* skip */ }
+    await new Promise(r => setTimeout(r, 300));
+  }
+  return emerging.sort((a, b) => b.velocity - a.velocity);
+}
+
+app.get('/api/emerging', async (req, res) => {
+  try {
+    const fromDB = getEmergingKeywords(20);
+
+    if (fromDB.length === 0) {
+      const fresh = await detectEmergingKeywords();
+      return res.json({ source: 'fresh', detectedAt: new Date().toISOString(), keywords: fresh });
+    }
+    res.json({ source: 'db', detectedAt: fromDB[0]?.last_updated, keywords: fromDB });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+// [VitaView v2] 작업 6: 경쟁사 신제품 모니터링
+// ═══════════════════════════════════════════════════════════
+
+// SP-API 제품 데이터를 competitor_products 테이블에 자동 upsert
+function trackCompetitorProducts(catId, topProducts) {
+  if (!topProducts || topProducts.length === 0) return;
+  try {
+    runTransaction(() => {
+      topProducts.forEach(p => {
+        if (p.asin) {
+          upsertCompetitorProduct({
+            asin: p.asin, product_name: p.title, category: catId,
+            bsr: p.rank, price: p.price
+          });
+        }
+      });
+    });
+  } catch(e) { /* DB 저장 실패 무시 */ }
+}
+
+// GET /api/new-products?category=supplements&days=90
+app.get('/api/new-products', async (req, res) => {
+  const { category = 'supplements', days = 90 } = req.query;
+  try {
+    const products = db.prepare(`
+      SELECT * FROM competitor_products
+      WHERE is_new_product = 1 AND category = ?
+      AND first_seen_at > datetime('now', '-' || ? || ' days')
+      ORDER BY first_seen_at DESC LIMIT 50
+    `).all(category, days);
+
+    res.json({
+      category, monitoringPeriodDays: parseInt(days),
+      newProductsFound: products.length,
+      products: products.map(p => ({
+        asin: p.asin, productName: p.product_name,
+        price: p.price, firstSeenAt: p.first_seen_at,
+        bsrTrend: calculateBSRTrend(p.bsr_history)
+      }))
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+// [VitaView v2] 작업 7: Gemini AI 전략 분석 프롬프트 강화
+// ═══════════════════════════════════════════════════════════
+
+let geminiStrategyCache = {};
+const GEMINI_STRATEGY_CACHE_TTL = 6 * 60 * 60 * 1000; // 6시간
+
+async function getGeminiStrategyAnalysis(keyword, opportunityData) {
+  const cacheKey = keyword.toLowerCase();
+  if (geminiStrategyCache[cacheKey] && Date.now() - geminiStrategyCache[cacheKey].time < GEMINI_STRATEGY_CACHE_TTL) {
+    return geminiStrategyCache[cacheKey].data;
+  }
+
+  if (!GEMINI_API_KEY) return null;
+
+  const prompt = `당신은 아마존 서플리먼트 시장 전문 분석가입니다. 아래 데이터를 분석해서 신제품 진입 전략을 알려주세요.
+
+## 분석 대상: ${keyword}
+## 시장 데이터:
+- HHI 지수: ${opportunityData.hhi || 'N/A'} (${(opportunityData.hhi || 0) < 1500 ? '분산 시장' : '집중 시장'})
+- Google Trends 성장률: ${opportunityData.trendGrowthRate || 'N/A'}%
+- Reddit 부정 언급 비율: ${opportunityData.redditNegativeRatio || 'N/A'}%
+- Opportunity Score: ${opportunityData.opportunityScore || 'N/A'}점 / 100점
+- 특허 현황: ${opportunityData.patentStatus || 'N/A'}
+- 예상 마진: ${opportunityData.estimatedMargin || 'N/A'}%
+
+## 요청사항 (반드시 아래 형식으로만 답변):
+1. **한줄 결론** (진입 추천 여부와 이유, 20자 이내)
+2. **차별화 포인트 TOP 3** (소비자 불만 기반, 각 1줄)
+3. **예상 리스크 TOP 2** (각 1줄)
+4. **첫 3개월 액션 플랜** (3단계, 각 1줄)`;
+
+  try {
+    const geminiBody = JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+    });
+
+    const response = await httpsPost(
+      'generativelanguage.googleapis.com',
+      `/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
+      { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(geminiBody) },
+      geminiBody
+    );
+
+    const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const result = {
+      summary: text || 'AI 분석 실패',
+      generatedAt: new Date().toISOString(),
+      model: 'gemini-2.5-flash-lite',
+      isAIGenerated: true
+    };
+    geminiStrategyCache[cacheKey] = { data: result, time: Date.now() };
+    return result;
+  } catch(e) {
+    return { summary: 'AI 분석 실패: ' + e.message, isAIGenerated: true, error: true };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// [VitaView v2] 작업 8: OpenFDA 강화 + DB 저장
+// ═══════════════════════════════════════════════════════════
+
+async function analyzeFDASignals(ingredient) {
+  const today = new Date().toISOString().split('T')[0];
+  const cached = getFDASignal(ingredient.toLowerCase(), today);
+  if (cached) return cached;
+
+  try {
+    const adverseUrl = `/food/enforcement.json?search=product_description:"${encodeURIComponent(ingredient)}"&count=report_date`;
+    const adverseData = await httpsGet('api.fda.gov', adverseUrl, {});
+
+    const results = adverseData.data?.results || [];
+    const recentCount = results.slice(-3).reduce((a, b) => a + (b.count || 0), 0);
+    const prevCount = results.slice(-6, -3).reduce((a, b) => a + (b.count || 0), 0);
+    const trend = recentCount > prevCount * 1.3 ? 'increasing' : recentCount < prevCount * 0.7 ? 'decreasing' : 'stable';
+    const opportunityFlag = trend !== 'stable';
+
+    saveFDASignal({
+      ingredient: ingredient.toLowerCase(),
+      adverse_event_count: recentCount,
+      adverse_event_trend: trend,
+      new_approval: false,
+      opportunity_flag: opportunityFlag,
+      snapshot_date: today
+    });
+
+    return { ingredient, adverse_event_count: recentCount, adverse_event_trend: trend, opportunity_flag: opportunityFlag };
+  } catch(e) {
+    return { ingredient, adverse_event_count: 0, adverse_event_trend: 'unknown', opportunity_flag: false, error: e.message };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// [VitaView v2] 작업 10: 히스토리 + 대시보드 API
+// ═══════════════════════════════════════════════════════════
+
+// GET /api/history?keyword=omega3&days=30
+app.get('/api/history', (req, res) => {
+  const { keyword, days = 30 } = req.query;
+  if (!keyword) return res.status(400).json({ error: 'keyword 파라미터 필요' });
+
+  try {
+    const history = db.prepare(`
+      SELECT keyword, opportunity_score, verdict, hhi_score,
+             trend_growth_rate, reddit_negative_ratio, created_at
+      FROM trend_snapshots
+      WHERE keyword = ? AND created_at > datetime('now', '-' || ? || ' days')
+      ORDER BY created_at ASC
+    `).all(keyword, days);
+
+    res.json({
+      keyword, periodDays: parseInt(days), dataPoints: history.length, history,
+      scoreChange: history.length >= 2
+        ? history[history.length - 1].opportunity_score - history[0].opportunity_score : null
+    });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/dashboard
+app.get('/api/dashboard', (req, res) => {
+  try {
+    const topOpportunities = db.prepare(`
+      SELECT keyword, opportunity_score, verdict, trend_growth_rate, hhi_score, MAX(created_at) as latest
+      FROM trend_snapshots GROUP BY keyword ORDER BY opportunity_score DESC LIMIT 10
+    `).all();
+
+    const emergingKeywords = db.prepare(`
+      SELECT * FROM emerging_keywords WHERE status IN ('new', 'rising')
+      ORDER BY mention_velocity DESC LIMIT 5
+    `).all();
+
+    const newProducts = db.prepare(`
+      SELECT * FROM competitor_products WHERE is_new_product = 1
+      ORDER BY first_seen_at DESC LIMIT 10
+    `).all();
+
+    const fdaSignals = db.prepare(`
+      SELECT * FROM fda_signals WHERE opportunity_flag = 1
+      ORDER BY snapshot_date DESC LIMIT 5
+    `).all();
+
+    res.json({ generatedAt: new Date().toISOString(), topOpportunities, emergingKeywords, newProducts, fdaSignals });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+// [VitaView v2] 작업 9: 자동 스냅샷 스케줄러
+// ═══════════════════════════════════════════════════════════
+
+const MONITORED_KEYWORDS = [
+  'omega3', 'magnesium', 'collagen', 'vitamin d', 'probiotics',
+  'creatine', 'ashwagandha', 'turmeric', 'melatonin', 'zinc',
+  'protein powder', 'multivitamin', 'iron supplement', 'b12', 'coq10'
+];
+
+// 매일 오전 6시 (UTC) 전체 스냅샷
+cron.schedule('0 6 * * *', async () => {
+  console.log('[VitaView Cron] 일일 스냅샷 시작...');
+  for (const keyword of MONITORED_KEYWORDS) {
+    try {
+      const catId = Object.keys(CATEGORY_KEYWORDS).find(k =>
+        k.toLowerCase() === keyword.toLowerCase() ||
+        CATEGORY_KEYWORDS[k].toLowerCase().includes(keyword.toLowerCase())
+      );
+      const catData = trendsCache?.categories?.[catId];
+      if (!catData) continue;
+
+      const scoreResult = calculateOpportunityScore(
+        { catId: catId || keyword, hhi: catData.hhi, brandCount: catData.brandCount || Object.keys(catData.brands || {}).length,
+          topShare: catData.topBrandShare, topBrandShare: catData.topBrandShare, topProducts: catData.topProducts || [] },
+        {}
+      );
+
+      saveTrendSnapshot({
+        keyword, category: catId || 'general',
+        google_trends_value: scoreResult.scoreBreakdown?.trendMomentum?.currentValue || null,
+        google_trends_3m_avg: scoreResult.scoreBreakdown?.trendMomentum?.recent3mAvg || null,
+        google_trends_prev_3m_avg: scoreResult.scoreBreakdown?.trendMomentum?.prev3mAvg || null,
+        trend_growth_rate: scoreResult.scoreBreakdown?.trendMomentum?.growthRate || null,
+        reddit_mention_count: scoreResult.scoreBreakdown?.consumerDissatisfaction?.redditMentionCount || null,
+        reddit_negative_ratio: scoreResult.scoreBreakdown?.consumerDissatisfaction?.negativeRatio || null,
+        youtube_view_count: scoreResult.scoreBreakdown?.demandSignal?.youtubeViewCount || null,
+        youtube_video_count: scoreResult.scoreBreakdown?.demandSignal?.youtubeVideoCount || null,
+        bsr_value: scoreResult.scoreBreakdown?.marketAccessibility?.bsr || null,
+        hhi_score: scoreResult.scoreBreakdown?.marketAccessibility?.hhi || catData.hhi || null,
+        opportunity_score: scoreResult.opportunityScore, verdict: scoreResult.verdict
+      });
+      console.log(`[VitaView Cron] ${keyword} 저장 완료`);
+    } catch (err) {
+      console.error(`[VitaView Cron] ${keyword} 실패:`, err.message);
+    }
+  }
+});
+
+// 매 6시간마다 신흥 키워드 감지
+cron.schedule('0 */6 * * *', async () => {
+  console.log('[VitaView Cron] 신흥 키워드 감지 시작...');
+  try {
+    await detectEmergingKeywords();
+    console.log('[VitaView Cron] 신흥 키워드 감지 완료');
+  } catch(e) {
+    console.error('[VitaView Cron] 신흥 키워드 감지 실패:', e.message);
+  }
+});
+
+// ═══════════════════════════════════════════════════════════
+
 app.listen(PORT, () => {
   console.log(`🚀 VitaView Backend running on http://localhost:${PORT}`);
   console.log(`📋 Mode: LIVE (SP-API direct HTTP)`);
+  console.log('[VitaView v2] SQLite DB, Google Trends npm, node-cron 활성화');
   getAccessToken()
     .then(() => {
       console.log('✅ SP-API connected!');
@@ -2953,6 +3394,10 @@ app.listen(PORT, () => {
       trendsCache = data;
       trendsCacheTime = Date.now();
       console.log('✅ Trends data pre-cached! First load will be instant.');
+      // [VitaView v2] 초기 로드 시 경쟁사 제품 DB 추적 시작
+      Object.entries(data.categories || {}).forEach(([catId, catData]) => {
+        trackCompetitorProducts(catId, catData.topProducts);
+      });
     })
     .catch(e => console.log('⚠️ SP-API:', e.message));
 });

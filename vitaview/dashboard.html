@@ -332,8 +332,6 @@ function VitaView() {
   const [aiDomSubTab, setAiDomSubTab] = useState("domination");
 
   // Module 1: Amazon Long-tail Keywords
-  const [longtailData, setLongtailData] = useState(null);
-  const [longtailLoading, setLongtailLoading] = useState(false);
   const [longtailCategory, setLongtailCategory] = useState("");
 
   // AI Formulator states
@@ -420,12 +418,6 @@ function VitaView() {
       fetch(`${API_BASE}/api/margin-calculator`)
         .then(r => r.json()).then(d => { if (d.products) setMarginData(d); })
         .catch(() => {}).finally(() => setMarginLoading(false));
-    }
-    if (activeTab === "aiAnalysis" && aiDomSubTab === "longtail" && !longtailData && !longtailLoading) {
-      setLongtailLoading(true);
-      fetch(`${API_BASE}/api/longtail-keywords`)
-        .then(r => r.json()).then(d => { if (d.keywords) setLongtailData(d); })
-        .catch(() => {}).finally(() => setLongtailLoading(false));
     }
   }, [activeTab, activeCategory, trends, aiDomSubTab]);
 
@@ -1972,7 +1964,7 @@ function VitaView() {
                                 </div>
                                 <div style={{ background: "#f0fdf4", borderRadius: 8, padding: 10, textAlign: "center" }}>
                                   <div style={{ fontSize: 14, fontWeight: 800, color: "#059669" }}>${Math.round((sel.marketSizing.annualMarketSize || 0) * fCustomSharePct / 100).toLocaleString()}</div>
-                                  <div style={{ fontSize: 9, color: "#94a3b8" }}>우리 예상 매출</div>
+                                  <div style={{ fontSize: 9, color: "#94a3b8" }}>우리 예상 매출 <span style={{ background: "#fef3c7", color: "#92400e", padding: "1px 4px", borderRadius: 3, fontSize: 7, fontWeight: 600 }}>AI 추정값</span></div>
                                 </div>
                               </div>
                               {/* Share slider */}
@@ -2022,11 +2014,11 @@ function VitaView() {
                               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
                                 <div style={{ background: "#ecfdf5", borderRadius: 8, padding: 10, textAlign: "center" }}>
                                   <div style={{ fontSize: 18, fontWeight: 800, color: "#059669" }}>${(sel.roiProjection.monthlyRevenue || customMonthlyRev).toLocaleString()}</div>
-                                  <div style={{ fontSize: 9, color: "#64748b" }}>월 매출</div>
+                                  <div style={{ fontSize: 9, color: "#64748b" }}>월 매출 <span style={{ background: "#fef3c7", color: "#92400e", padding: "1px 4px", borderRadius: 3, fontSize: 8, fontWeight: 600 }}>AI 추정값</span></div>
                                 </div>
                                 <div style={{ background: "#f0fdf4", borderRadius: 8, padding: 10, textAlign: "center" }}>
                                   <div style={{ fontSize: 18, fontWeight: 800, color: "#10b981" }}>${(sel.roiProjection.monthlyProfit || customMonthlyProfit).toLocaleString()}</div>
-                                  <div style={{ fontSize: 9, color: "#64748b" }}>월 순이익</div>
+                                  <div style={{ fontSize: 9, color: "#64748b" }}>월 순이익 <span style={{ background: "#fef3c7", color: "#92400e", padding: "1px 4px", borderRadius: 3, fontSize: 8, fontWeight: 600 }}>AI 추정값</span></div>
                                 </div>
                               </div>
 
@@ -2039,7 +2031,7 @@ function VitaView() {
                                     <div style={{ fontSize: 10, color: "#94a3b8" }}>개월</div>
                                   </div>
                                   <div style={{ textAlign: "center" }}>
-                                    <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 4 }}>1년 ROI</div>
+                                    <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 4 }}>1년 ROI <span style={{ background: "#fef3c7", color: "#92400e", padding: "1px 3px", borderRadius: 3, fontSize: 7, fontWeight: 600 }}>AI 추정</span></div>
                                     <div style={{ fontSize: 28, fontWeight: 800, color: userYearROI > 100 ? "#10b981" : userYearROI > 0 ? "#f59e0b" : "#ef4444" }}>{userYearROI}%</div>
                                     <div style={{ fontSize: 10, color: "#94a3b8" }}>수익률</div>
                                   </div>
@@ -2053,11 +2045,11 @@ function VitaView() {
                                   <span style={{ fontWeight: 700 }}>${fCustomBudget.toLocaleString()}</span>
                                 </div>
                                 <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f1f5f9" }}>
-                                  <span>연간 매출 예상</span>
+                                  <span>연간 매출 예상 <span style={{ background: "#fef3c7", color: "#92400e", padding: "1px 4px", borderRadius: 3, fontSize: 8, fontWeight: 600 }}>AI 추정값</span></span>
                                   <span style={{ fontWeight: 700, color: "#059669" }}>${((sel.roiProjection.monthlyRevenue || customMonthlyRev) * 12).toLocaleString()}</span>
                                 </div>
                                 <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f1f5f9" }}>
-                                  <span>연간 순이익 예상</span>
+                                  <span>연간 순이익 예상 <span style={{ background: "#fef3c7", color: "#92400e", padding: "1px 4px", borderRadius: 3, fontSize: 8, fontWeight: 600 }}>AI 추정값</span></span>
                                   <span style={{ fontWeight: 700, color: "#10b981" }}>${((sel.roiProjection.monthlyProfit || customMonthlyProfit) * 12).toLocaleString()}</span>
                                 </div>
                                 <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
@@ -2781,8 +2773,7 @@ function VitaView() {
                 ["domination", "\u{1F3AF} Domination Score"],
                 ["keywords", "\u{1F50D} Keyword Intelligence"],
                 ["trends", "\u{1F4C8} Trend Analysis"],
-                ["hashtags", "#\uFE0F\u20E3 Hashtag Discovery"],
-                ["longtail", "\u{1F50E} Longtail Keywords"],
+                ["hashtags", "\u{1F50D} Search Demand"],
                 ["legalBarrier", "\u{1F6E1}\uFE0F Legal Barrier"],
                 ["margin", "\u{1F4B0} Margin Calculator"]
               ].map(([id, label]) => (
@@ -3122,62 +3113,57 @@ function VitaView() {
             )}
 
             {/* ═══════ HASHTAG DISCOVERY SUB-TAB ═══════ */}
+            {/* [VitaView v2] Search Demand Intelligence (기존 Hashtag Discovery 개편) */}
             {aiDomSubTab === "hashtags" && (
               <div>
                 {keywordIntelLoading ? <CategoryLoadingSpinner /> : keywordIntel ? (() => {
-                  const { hashtags, trendingIngredients, topKeywords, formAnalysis } = keywordIntel;
+                  const { trendingIngredients, topKeywords, formAnalysis } = keywordIntel;
 
-                  // Generate extended hashtags
-                  const formHashtags = formAnalysis.map(f => ({
-                    tag: '#' + f.form + 'Supplements',
-                    count: f.count,
-                    type: 'form'
+                  // 섹션 1: 아마존 인기 검색 성분
+                  const amazonIngredients = trendingIngredients.slice(0, 25).map(k => ({
+                    keyword: k.keyword.charAt(0).toUpperCase() + k.keyword.slice(1),
+                    count: k.count, spread: k.categorySpread
                   }));
-                  const ingredientHashtags = trendingIngredients.slice(0, 25).map(k => ({
-                    tag: '#' + k.keyword.charAt(0).toUpperCase() + k.keyword.slice(1),
-                    count: k.count,
-                    spread: k.categorySpread,
-                    type: 'ingredient'
-                  }));
-                  const lifestyleHashtags = [
-                    { tag: '#GutHealth', type: 'lifestyle' },
-                    { tag: '#LongevityHack', type: 'lifestyle' },
-                    { tag: '#BiohackingLife', type: 'lifestyle' },
-                    { tag: '#CleanSupplements', type: 'lifestyle' },
-                    { tag: '#HolisticHealth', type: 'lifestyle' },
-                    { tag: '#WellnessJourney', type: 'lifestyle' },
-                    { tag: '#SupplementStack', type: 'lifestyle' },
-                    { tag: '#NaturalHealth', type: 'lifestyle' },
-                    { tag: '#FitnessNutrition', type: 'lifestyle' },
-                    { tag: '#ImmuneBoost', type: 'lifestyle' },
-                    { tag: '#BrainHealth', type: 'lifestyle' },
-                    { tag: '#AntiAging', type: 'lifestyle' },
-                    { tag: '#MuscleRecovery', type: 'lifestyle' },
-                    { tag: '#PlantBased', type: 'lifestyle' },
-                    { tag: '#KetoDiet', type: 'lifestyle' },
-                  ];
 
-                  // Combine Google trends if available
-                  const googleHashtags = googleTrends
+                  // 섹션 2: Google 급상승 검색어
+                  const googleKeywords = googleTrends
                     ? googleTrends.trendingKeywords.slice(0, 15).map(k => ({
-                        tag: '#' + k.keyword.charAt(0).toUpperCase() + k.keyword.slice(1),
-                        count: k.count,
-                        type: 'google'
+                        keyword: k.keyword.charAt(0).toUpperCase() + k.keyword.slice(1),
+                        count: k.count
                       }))
                     : [];
 
+                  // 섹션 3: 제형 트렌드
+                  const totalFormCount = formAnalysis.reduce((s, f) => s + f.count, 0);
+
+                  // 섹션 4: 소비자 관심사 키워드
+                  const consumerKeywords = [
+                    { keyword: 'Gut Health', sources: ['Amazon', 'Reddit'] },
+                    { keyword: 'Longevity', sources: ['Google', 'Reddit'] },
+                    { keyword: 'Biohacking', sources: ['Reddit'] },
+                    { keyword: 'Clean Label', sources: ['Amazon'] },
+                    { keyword: 'Holistic Health', sources: ['Google'] },
+                    { keyword: 'Wellness', sources: ['Amazon', 'Google'] },
+                    { keyword: 'Natural', sources: ['Amazon'] },
+                    { keyword: 'Immune Support', sources: ['Amazon', 'Google'] },
+                    { keyword: 'Brain Health', sources: ['Google', 'Reddit'] },
+                    { keyword: 'Anti-Aging', sources: ['Google'] },
+                    { keyword: 'Muscle Recovery', sources: ['Amazon', 'Reddit'] },
+                    { keyword: 'Plant-Based', sources: ['Amazon', 'Google'] },
+                  ];
+
                   return (
                     <div>
-                      {/* Hashtag Hero Section */}
+                      {/* Search Demand Hero */}
                       <div style={{ background: "linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #1e1b4b 100%)", borderRadius: 16, padding: 28, marginBottom: 24, color: "#fff" }}>
-                        <h3 style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>#️⃣ Hashtag & Keyword Discovery</h3>
-                        <p style={{ fontSize: 13, color: "#94a3b8", marginBottom: 20 }}>Amazon product data + Google search trends = actionable hashtags for marketing & product positioning</p>
+                        <h3 style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>Search Demand Intelligence</h3>
+                        <p style={{ fontSize: 13, color: "#94a3b8", marginBottom: 20 }}>아마존, Google, Reddit, YouTube에서 소비자들이 실제로 무엇을 검색하고 있는지 분석합니다.</p>
                         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
                           {[
-                            { label: "Ingredient Tags", value: ingredientHashtags.length, color: "#10b981" },
-                            { label: "Form Tags", value: formHashtags.length, color: "#3b82f6" },
-                            { label: "Google Trends", value: googleHashtags.length, color: "#f59e0b" },
-                            { label: "Lifestyle Tags", value: lifestyleHashtags.length, color: "#ec4899" },
+                            { label: "아마존 인기 성분", value: amazonIngredients.length, color: "#10b981" },
+                            { label: "Google 급상승", value: googleKeywords.length, color: "#3b82f6" },
+                            { label: "제형 트렌드", value: formAnalysis.length, color: "#8b5cf6" },
+                            { label: "소비자 관심사", value: consumerKeywords.length, color: "#ec4899" },
                           ].map((s, i) => (
                             <div key={i} style={{ background: "rgba(255,255,255,0.08)", borderRadius: 10, padding: "10px 18px", border: `1px solid ${s.color}33` }}>
                               <div style={{ fontSize: 22, fontWeight: 800, color: s.color }}>{s.value}</div>
@@ -3187,70 +3173,98 @@ function VitaView() {
                         </div>
                       </div>
 
-                      {/* Ingredient-Based Hashtags */}
-                      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 20, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-                        <h3 style={{ fontSize: 15, fontWeight: 700, color: "#10b981", marginBottom: 4 }}>{"\u{1F33F}"} Ingredient-Based Hashtags (from Amazon Data)</h3>
-                        <p style={{ fontSize: 11, color: "#64748b", marginBottom: 14 }}>Derived from cross-category trending ingredients on Amazon</p>
+                      {/* 섹션 1: 아마존 인기 검색 성분 */}
+                      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 20 }}>
+                        <h3 style={{ fontSize: 15, fontWeight: 700, color: "#10b981", marginBottom: 4 }}>아마존 인기 검색 성분</h3>
+                        <p style={{ fontSize: 11, color: "#64748b", marginBottom: 14 }}>아마존 제품 데이터에서 추출한 크로스 카테고리 트렌딩 성분</p>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                          {ingredientHashtags.map((h, i) => (
-                            <div key={h.tag} style={{
-                              background: i < 5 ? "linear-gradient(135deg, #ecfdf5, #f0fdf4)" : "#f8fafc",
+                          {amazonIngredients.map((h, i) => (
+                            <div key={h.keyword} style={{
+                              background: i < 5 ? "#ecfdf5" : "#f8fafc",
                               border: `1px solid ${i < 5 ? "#10b981" : "#e2e8f0"}`,
-                              borderRadius: 20, padding: "6px 16px",
-                              display: "flex", alignItems: "center", gap: 6, cursor: "default"
+                              borderRadius: 10, padding: "8px 14px",
+                              display: "flex", alignItems: "center", gap: 8
                             }}>
-                              <span style={{ fontSize: 14, fontWeight: 700, color: i < 5 ? "#059669" : "#64748b" }}>{h.tag}</span>
-                              <span style={{ fontSize: 10, color: "#94a3b8" }}>{h.count}x</span>
-                              {h.spread >= 5 && <span style={{ fontSize: 9, background: "#fef3c7", color: "#d97706", padding: "1px 6px", borderRadius: 8, fontWeight: 600 }}>HOT</span>}
+                              <span style={{ fontSize: 13, fontWeight: 700, color: i < 5 ? "#059669" : "#334155" }}>{h.keyword}</span>
+                              <span style={{ fontSize: 10, color: "#94a3b8", background: "#f1f5f9", padding: "2px 6px", borderRadius: 6 }}>아마존 {h.count}개 제품</span>
+                              <span style={{ fontSize: 9, background: "#eef2ff", color: "#4338ca", padding: "1px 6px", borderRadius: 6, fontWeight: 600 }}>[Amazon]</span>
                             </div>
                           ))}
                         </div>
                       </div>
 
-                      {/* Google Trend Hashtags */}
-                      {googleHashtags.length > 0 && (
-                        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 20, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-                          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#3b82f6", marginBottom: 4 }}>{"\u{1F310}"} Google Search Trend Hashtags</h3>
-                          <p style={{ fontSize: 11, color: "#64748b", marginBottom: 14 }}>From real-time Google search autocomplete data</p>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                            {googleHashtags.map((h, i) => (
-                              <div key={h.tag} style={{
-                                background: i < 3 ? "linear-gradient(135deg, #eff6ff, #eef2ff)" : "#f8fafc",
-                                border: `1px solid ${i < 3 ? "#3b82f6" : "#e2e8f0"}`,
-                                borderRadius: 20, padding: "6px 16px"
+                      {/* 섹션 2: Google 급상승 검색어 */}
+                      {googleKeywords.length > 0 && (
+                        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 20 }}>
+                          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#3b82f6", marginBottom: 4 }}>Google 급상승 검색어</h3>
+                          <p style={{ fontSize: 11, color: "#64748b", marginBottom: 14 }}>Google 검색 자동완성에서 실시간 수집한 검색어</p>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            {googleKeywords.map((h, i) => (
+                              <div key={h.keyword} style={{
+                                display: "flex", alignItems: "center", gap: 10, padding: "8px 14px",
+                                background: i < 3 ? "#eff6ff" : "#f8fafc", borderRadius: 8,
+                                border: `1px solid ${i < 3 ? "#bfdbfe" : "#e2e8f0"}`
                               }}>
-                                <span style={{ fontSize: 14, fontWeight: 700, color: i < 3 ? "#2563eb" : "#64748b" }}>{h.tag}</span>
+                                <span style={{ fontWeight: 800, color: i < 3 ? "#2563eb" : "#64748b", minWidth: 24 }}>#{i+1}</span>
+                                <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", flex: 1 }}>{h.keyword}</span>
+                                <span style={{ fontSize: 9, background: "#dbeafe", color: "#1d4ed8", padding: "2px 8px", borderRadius: 6, fontWeight: 600 }}>[Google Trends]</span>
                               </div>
                             ))}
                           </div>
                         </div>
                       )}
 
-                      {/* Form + Lifestyle Hashtags */}
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-                          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#8b5cf6", marginBottom: 12 }}>{"\u{1F48A}"} Product Form Hashtags</h3>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                            {formHashtags.map(h => (
-                              <span key={h.tag} style={{ background: "#faf5ff", color: "#7c3aed", border: "1px solid #e9d5ff", padding: "5px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600 }}>{h.tag}</span>
-                            ))}
-                          </div>
+                      {/* 섹션 3: 인기 제형 트렌드 (가로 바 차트) */}
+                      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 20 }}>
+                        <h3 style={{ fontSize: 15, fontWeight: 700, color: "#8b5cf6", marginBottom: 4 }}>인기 제형 트렌드</h3>
+                        <p style={{ fontSize: 11, color: "#64748b", marginBottom: 14 }}>제형별 수요 비율 (아마존 제품 데이터 기반)</p>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {formAnalysis.map((f, i) => {
+                            const pct = totalFormCount > 0 ? Math.round((f.count / totalFormCount) * 100) : 0;
+                            const colors = ['#8b5cf6', '#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#84cc16'];
+                            return (
+                              <div key={f.form} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                <span style={{ fontSize: 12, fontWeight: 600, color: "#334155", minWidth: 80 }}>{f.form}</span>
+                                <div style={{ flex: 1, height: 20, background: "#f1f5f9", borderRadius: 4, overflow: "hidden", position: "relative" }}>
+                                  <div style={{ height: "100%", width: pct + "%", background: colors[i % colors.length], borderRadius: 4, transition: "width 0.5s" }} />
+                                  <span style={{ position: "absolute", right: 6, top: 2, fontSize: 10, fontWeight: 700, color: pct > 30 ? "#fff" : "#334155" }}>{pct}%</span>
+                                </div>
+                                <span style={{ fontSize: 10, color: "#94a3b8", minWidth: 50, textAlign: "right" }}>{f.count}개</span>
+                                <span style={{ fontSize: 9, background: "#eef2ff", color: "#4338ca", padding: "1px 6px", borderRadius: 6, fontWeight: 600 }}>[Amazon]</span>
+                              </div>
+                            );
+                          })}
                         </div>
-                        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-                          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#ec4899", marginBottom: 12 }}>{"\u2728"} Lifestyle & Marketing Hashtags</h3>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                            {lifestyleHashtags.map(h => (
-                              <span key={h.tag} style={{ background: "#fdf2f8", color: "#db2777", border: "1px solid #fbcfe8", padding: "5px 14px", borderRadius: 20, fontSize: 13, fontWeight: 600 }}>{h.tag}</span>
-                            ))}
-                          </div>
+                      </div>
+
+                      {/* 섹션 4: 소비자 관심사 키워드 */}
+                      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20 }}>
+                        <h3 style={{ fontSize: 15, fontWeight: 700, color: "#ec4899", marginBottom: 4 }}>소비자 관심사 키워드</h3>
+                        <p style={{ fontSize: 11, color: "#64748b", marginBottom: 14 }}>소비자들이 서플리먼트 구매 시 중요하게 보는 키워드</p>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {consumerKeywords.map(k => (
+                            <div key={k.keyword} style={{
+                              background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10,
+                              padding: "8px 14px", display: "flex", alignItems: "center", gap: 6
+                            }}>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>{k.keyword}</span>
+                              {k.sources.map(s => (
+                                <span key={s} style={{
+                                  fontSize: 8, padding: "1px 6px", borderRadius: 6, fontWeight: 700,
+                                  background: s === 'Amazon' ? '#ecfdf5' : s === 'Google' ? '#dbeafe' : '#fef2f2',
+                                  color: s === 'Amazon' ? '#059669' : s === 'Google' ? '#1d4ed8' : '#dc2626'
+                                }}>[{s}]</span>
+                              ))}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
                   );
                 })() : (
                   <div style={{ textAlign: "center", padding: 60, color: "#94a3b8" }}>
-                    <div style={{ fontSize: 48, marginBottom: 16 }}>#️⃣</div>
-                    <p>Click "Refresh" to load data for hashtag discovery</p>
+                    <div style={{ fontSize: 48, marginBottom: 16 }}>{"\u{1F50D}"}</div>
+                    <p>데이터를 로드하려면 "Refresh"를 클릭하세요</p>
                   </div>
                 )}
               </div>
@@ -3678,116 +3692,14 @@ function VitaView() {
             </>
             )}
 
-            {/* MODULE 1: LONGTAIL KEYWORDS SUB-TAB */}
-            {aiDomSubTab === "longtail" && (
-              <div>
-                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 24, marginBottom: 20 }}>
-                  <h3 style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>{"\u{1F50E}"} Amazon Long-tail Keyword Extractor</h3>
-                  <p style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>SP-API 카테고리 데이터 기반 아마존 자동완성 롱테일 키워드 발굴</p>
+            {/* [VitaView v2] Longtail Keywords 탭 삭제됨 - Keyword Intelligence로 통합 */}
 
-                  {/* Category filter */}
-                  <div style={{ display: "flex", gap: 12, marginBottom: 20, alignItems: "center", flexWrap: "wrap" }}>
-                    <select value={longtailCategory} onChange={e => setLongtailCategory(e.target.value)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, minWidth: 200 }}>
-                      <option value="">All Categories (Top 20)</option>
-                      {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
-                    </select>
-                    <button onClick={() => {
-                      setLongtailData(null);
-                      setLongtailLoading(true);
-                      const url = longtailCategory
-                        ? `${API_BASE}/api/longtail-keywords?category=${longtailCategory}`
-                        : `${API_BASE}/api/longtail-keywords`;
-                      fetch(url)
-                        .then(r => r.json()).then(d => { if (d.keywords) setLongtailData(d); })
-                        .catch(() => {}).finally(() => setLongtailLoading(false));
-                    }} style={{ background: "linear-gradient(135deg, #10b981, #3b82f6)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                      {longtailLoading ? "Loading..." : "\u{1F504} Fetch Keywords"}
-                    </button>
-                    {longtailData && (
-                      <span style={{ fontSize: 12, color: "#94a3b8" }}>
-                        {longtailData.totalCategories} categories | Updated: {new Date(longtailData.timestamp).toLocaleTimeString()}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {longtailLoading && (
-                  <div style={{ textAlign: "center", padding: 60 }}>
-                    <div style={{ width: 40, height: 40, border: "3px solid rgba(16,185,129,0.2)", borderTopColor: "#10b981", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
-                    <div style={{ color: "#64748b" }}>Fetching Amazon autocomplete data... (rate-limited, may take a moment)</div>
-                  </div>
-                )}
-
-                {longtailData && !longtailLoading && Object.entries(longtailData.keywords || {}).map(([catId, catData]) => (
-                  <div key={catId} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 16 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                      <div>
-                        <h4 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", textTransform: "capitalize" }}>
-                          {(CATEGORIES.find(c => c.id === catId) || {}).icon || "\u{1F4E6}"} {catData.categoryName}
-                        </h4>
-                        <span style={{ fontSize: 11, color: "#94a3b8" }}>Seeds: {catData.seedKeywords?.join(", ")}</span>
-                      </div>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <span style={{ background: "#ecfdf5", color: "#059669", padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
-                          {catData.totalFound} keywords
-                        </span>
-                        <span style={{ background: "#eef2ff", color: "#6366f1", padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600 }}>
-                          {catData.longTailCount} long-tail (3+ words)
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Long-tail keywords table */}
-                    <div style={{ maxHeight: 300, overflowY: "auto" }}>
-                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-                        <thead>
-                          <tr style={{ background: "#f8fafc", position: "sticky", top: 0 }}>
-                            <th style={{ padding: "8px 10px", textAlign: "left", color: "#64748b", fontWeight: 600 }}>#</th>
-                            <th style={{ padding: "8px 10px", textAlign: "left", color: "#64748b", fontWeight: 600 }}>Keyword</th>
-                            <th style={{ padding: "8px 10px", textAlign: "center", color: "#64748b", fontWeight: 600 }}>Words</th>
-                            <th style={{ padding: "8px 10px", textAlign: "left", color: "#64748b", fontWeight: 600 }}>Seed</th>
-                            <th style={{ padding: "8px 10px", textAlign: "center", color: "#64748b", fontWeight: 600 }}>Action</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {catData.longtailKeywords?.map((kw, i) => (
-                            <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                              <td style={{ padding: "8px 10px", color: "#94a3b8" }}>{i + 1}</td>
-                              <td style={{ padding: "8px 10px", fontWeight: kw.isLongTail ? 600 : 400, color: kw.isLongTail ? "#0f172a" : "#64748b" }}>
-                                {kw.isLongTail && <span style={{ color: "#10b981", marginRight: 4 }}>{"\u2605"}</span>}
-                                {kw.keyword}
-                              </td>
-                              <td style={{ padding: "8px 10px", textAlign: "center" }}>
-                                <span style={{ background: kw.wordCount >= 4 ? "#dcfce7" : kw.wordCount >= 3 ? "#e0f2fe" : "#f1f5f9", color: kw.wordCount >= 4 ? "#16a34a" : kw.wordCount >= 3 ? "#2563eb" : "#94a3b8", padding: "2px 8px", borderRadius: 10, fontSize: 11, fontWeight: 600 }}>
-                                  {kw.wordCount}
-                                </span>
-                              </td>
-                              <td style={{ padding: "8px 10px", color: "#94a3b8", fontSize: 11 }}>{kw.seed}</td>
-                              <td style={{ padding: "8px 10px", textAlign: "center" }}>
-                                <a href={`https://www.amazon.com/s?k=${encodeURIComponent(kw.keyword)}`} target="_blank" rel="noopener noreferrer" style={{ color: "#f59e0b", textDecoration: "none", fontSize: 16 }} title="Search on Amazon">{"\u{1F50D}"}</a>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ))}
-
-                {longtailData && Object.keys(longtailData.keywords || {}).length === 0 && (
-                  <div style={{ textAlign: "center", padding: 60, color: "#94a3b8" }}>
-                    <p>No keywords found. Make sure trends data is loaded first.</p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* MODULE 3: LEGAL BARRIER SUB-TAB */}
+            {/* [VitaView v2] MODULE 3: LEGAL BARRIER SUB-TAB - 실제 작동 */}
             {aiDomSubTab === "legalBarrier" && (
               <div>
                 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 24, marginBottom: 20 }}>
-                  <h3 style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>{"\u{1F6E1}\uFE0F"} Entry Barrier &amp; Legal Risk Checker</h3>
-                  <p style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>브랜드 집중도 &amp; HHI 기반 진입 장벽 분석 + USPTO/Google Patents 검색 링크</p>
+                  <h3 style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>{"\u{1F6E1}\uFE0F"} Entry Barrier & Legal Risk Checker</h3>
+                  <p style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>HHI 기반 진입 장벽 분석 + 특허 직접 확인 링크</p>
 
                   <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                     <select value={legalCategory} onChange={e => setLegalCategory(e.target.value)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, minWidth: 200 }}>
@@ -3796,11 +3708,11 @@ function VitaView() {
                     <button onClick={() => {
                       setLegalData(null);
                       setLegalLoading(true);
-                      fetch(`${API_BASE}/api/legal-barrier?category=${legalCategory}`)
+                      fetch(`${API_BASE}/api/legal-barrier?keyword=${legalCategory}`)
                         .then(r => r.json()).then(d => { if (!d.error) setLegalData(d); })
                         .catch(() => {}).finally(() => setLegalLoading(false));
                     }} style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                      {legalLoading ? "Checking..." : "\u{1F50D} Check Barriers"}
+                      {legalLoading ? "분석 중..." : "\u{1F50D} 진입 장벽 분석"}
                     </button>
                   </div>
                 </div>
@@ -3808,58 +3720,76 @@ function VitaView() {
                 {legalLoading && (
                   <div style={{ textAlign: "center", padding: 60 }}>
                     <div style={{ width: 40, height: 40, border: "3px solid rgba(99,102,241,0.2)", borderTopColor: "#6366f1", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
-                    <div style={{ color: "#64748b" }}>Analyzing entry barriers...</div>
+                    <div style={{ color: "#64748b" }}>진입 장벽 분석 중...</div>
                   </div>
                 )}
 
                 {legalData && !legalLoading && (
                   <div>
-                    {/* Main Barrier Score Card */}
+                    {/* 진입 난이도 배지 */}
                     <div style={{ background: "linear-gradient(135deg, #0f172a, #1e293b)", borderRadius: 14, padding: 28, marginBottom: 20, color: "#fff", textAlign: "center" }}>
-                      <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>Entry Barrier Score - {legalData.categoryName}</div>
-                      <div style={{ fontSize: 64, fontWeight: 800, color: legalData.riskColor, marginBottom: 8 }}>{legalData.barrierScore}</div>
-                      <div style={{ display: "inline-block", background: legalData.riskColor, color: "#fff", padding: "6px 20px", borderRadius: 20, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
-                        {legalData.riskLevel} RISK
+                      <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>진입 난이도 - {legalData.categoryName || legalData.keyword}</div>
+                      <div style={{
+                        display: "inline-block", padding: "12px 36px", borderRadius: 16, fontSize: 28, fontWeight: 800, marginBottom: 12,
+                        background: legalData.entryDifficulty === 'LOW' ? '#10b981' : legalData.entryDifficulty === 'MEDIUM' ? '#f59e0b' : legalData.entryDifficulty === 'HIGH' ? '#f97316' : '#ef4444',
+                        color: "#fff"
+                      }}>
+                        {legalData.entryDifficulty === 'LOW' ? 'LOW - 진입 유리' : legalData.entryDifficulty === 'MEDIUM' ? 'MEDIUM - 보통' : legalData.entryDifficulty === 'HIGH' ? 'HIGH - 어려움' : 'VERY HIGH - 진입 불가'}
                       </div>
-                      <div style={{ fontSize: 13, color: "#cbd5e1", maxWidth: 500, margin: "0 auto", lineHeight: 1.5 }}>{legalData.riskAdvice}</div>
-                    </div>
 
-                    {/* Metrics Grid */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
-                      {[
-                        { label: "HHI Index", value: legalData.metrics?.hhi?.toLocaleString(), desc: legalData.metrics?.hhi > 2500 ? "Highly Concentrated" : legalData.metrics?.hhi > 1500 ? "Moderately Concentrated" : "Competitive", color: legalData.metrics?.hhi > 2500 ? "#ef4444" : legalData.metrics?.hhi > 1500 ? "#f59e0b" : "#10b981" },
-                        { label: "Top Brand Share", value: legalData.metrics?.topBrandShare + "%", desc: "Market leader dominance", color: legalData.metrics?.topBrandShare > 40 ? "#ef4444" : "#3b82f6" },
-                        { label: "Top 3 Share", value: legalData.metrics?.top3Share + "%", desc: "Combined top 3 brands", color: legalData.metrics?.top3Share > 60 ? "#ef4444" : "#6366f1" },
-                        { label: "Total Brands", value: legalData.metrics?.brandCount, desc: legalData.metrics?.brandCount > 20 ? "Fragmented (Good!)" : "Concentrated", color: legalData.metrics?.brandCount > 20 ? "#10b981" : "#f59e0b" },
-                        { label: "Total Products", value: legalData.metrics?.totalProducts, desc: "Products in category", color: "#3b82f6" },
-                        { label: "Fragmentation", value: legalData.opportunities?.fragmentationRatio + "%", desc: legalData.opportunities?.isFragmented ? "Market is fragmented!" : "Some consolidation", color: legalData.opportunities?.isFragmented ? "#10b981" : "#f59e0b" }
-                      ].map((m, i) => (
-                        <div key={i} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16, textAlign: "center" }}>
-                          <div style={{ fontSize: 24, fontWeight: 700, color: m.color }}>{m.value}</div>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", marginTop: 4 }}>{m.label}</div>
-                          <div style={{ fontSize: 10, color: "#94a3b8" }}>{m.desc}</div>
+                      {/* HHI 수치 + 판정 이유 */}
+                      {legalData.hhi !== null && (
+                        <div style={{ marginTop: 12 }}>
+                          <div style={{ fontSize: 36, fontWeight: 800, color: legalData.hhi > 2500 ? "#fca5a5" : legalData.hhi > 1800 ? "#fcd34d" : "#6ee7b7" }}>HHI {legalData.hhi?.toLocaleString()}</div>
+                          <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>{legalData.hhi < 1000 ? '분산된 시장 (진입 용이)' : legalData.hhi <= 1800 ? '보통 수준의 시장 집중도' : legalData.hhi <= 2500 ? '집중된 시장' : '독점 시장 (진입 극히 어려움)'}</div>
                         </div>
-                      ))}
+                      )}
+                      <div style={{ fontSize: 13, color: "#cbd5e1", maxWidth: 500, margin: "12px auto 0", lineHeight: 1.5 }}>
+                        {legalData.entryReasons?.map((r, i) => <div key={i}>{r}</div>)}
+                      </div>
                     </div>
 
-                    {/* Search Links - Manual Verification */}
-                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 20 }}>
-                      <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 14 }}>{"\u{1F50D}"} Manual Verification Links</h4>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
-                        {[
-                          { label: "USPTO Trademark Search", url: legalData.searchLinks?.usptoSearch, icon: "\u{1F3DB}\uFE0F", bg: "#eef2ff", color: "#4338ca", border: "#c7d2fe" },
-                          { label: "Google Patents", url: legalData.searchLinks?.googlePatents, icon: "\u{1F4C4}", bg: "#ecfdf5", color: "#059669", border: "#a7f3d0" },
-                          { label: "Alibaba Sourcing", url: legalData.searchLinks?.alibabaSearch, icon: "\u{1F6D2}", bg: "#fff7ed", color: "#ea580c", border: "#fed7aa" }
-                        ].map((link, i) => (
-                          <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: link.bg, border: `1px solid ${link.border}`, borderRadius: 10, padding: 14, textDecoration: "none", textAlign: "center" }}>
-                            <div style={{ fontSize: 24, marginBottom: 6 }}>{link.icon}</div>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: link.color }}>{link.label}</div>
-                          </a>
+                    {/* 특허 직접 확인 버튼 */}
+                    {legalData.patentLinks && (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+                        <a href={legalData.patentLinks.uspto} target="_blank" rel="noopener noreferrer" style={{
+                          display: "block", background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: 14, padding: 20, textDecoration: "none", textAlign: "center"
+                        }}>
+                          <div style={{ fontSize: 28, marginBottom: 8 }}>{"\u{1F3DB}\uFE0F"}</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#4338ca", marginBottom: 4 }}>USPTO 특허 검색</div>
+                          <div style={{ fontSize: 11, color: "#6366f1" }}>특허 직접 확인하기 {"\u2192"}</div>
+                        </a>
+                        <a href={legalData.patentLinks.googlePatents} target="_blank" rel="noopener noreferrer" style={{
+                          display: "block", background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 14, padding: 20, textDecoration: "none", textAlign: "center"
+                        }}>
+                          <div style={{ fontSize: 28, marginBottom: 8 }}>{"\u{1F4C4}"}</div>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: "#059669", marginBottom: 4 }}>Google Patents</div>
+                          <div style={{ fontSize: 11, color: "#10b981" }}>특허 직접 확인하기 {"\u2192"}</div>
+                        </a>
+                      </div>
+                    )}
+
+                    {/* 상위 브랜드 점유율 목록 */}
+                    {legalData.topBrands?.length > 0 && (
+                      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 20 }}>
+                        <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 14 }}>상위 브랜드 점유율</h4>
+                        {legalData.topBrands.map((b, i) => (
+                          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: i < legalData.topBrands.length - 1 ? "1px solid #f1f5f9" : "none" }}>
+                            <span style={{ fontWeight: 800, color: i === 0 ? "#ef4444" : "#64748b", minWidth: 24 }}>#{i+1}</span>
+                            <span style={{ fontWeight: 600, color: "#0f172a", flex: 1 }}>{b.name}</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <div style={{ width: 80, height: 6, background: "#f1f5f9", borderRadius: 3, overflow: "hidden" }}>
+                                <div style={{ width: `${b.marketShare}%`, height: "100%", background: b.marketShare >= 20 ? "#ef4444" : b.marketShare >= 10 ? "#f59e0b" : "#10b981", borderRadius: 3 }} />
+                              </div>
+                              <span style={{ fontSize: 12, fontWeight: 700, color: "#334155" }}>{b.marketShare}%</span>
+                            </div>
+                            <span style={{ fontSize: 11, color: "#94a3b8" }}>{b.productCount}개 제품</span>
+                          </div>
                         ))}
                       </div>
-                    </div>
+                    )}
 
-                    {/* Brand Landscape Table */}
+                    {/* 기존 하위호환: Brand Landscape + Opportunity Summary */}
                     {legalData.brandLandscape?.length > 0 && (
                       <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 20 }}>
                         <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 14 }}>Brand Landscape (Top 15)</h4>
@@ -3870,7 +3800,7 @@ function VitaView() {
                                 <th style={{ padding: "8px 10px", textAlign: "left", color: "#64748b" }}>#</th>
                                 <th style={{ padding: "8px 10px", textAlign: "left", color: "#64748b" }}>Brand</th>
                                 <th style={{ padding: "8px 10px", textAlign: "center", color: "#64748b" }}>Products</th>
-                                <th style={{ padding: "8px 10px", textAlign: "center", color: "#64748b" }}>Market Share</th>
+                                <th style={{ padding: "8px 10px", textAlign: "center", color: "#64748b" }}>Share</th>
                                 <th style={{ padding: "8px 10px", textAlign: "center", color: "#64748b" }}>TM Risk</th>
                               </tr>
                             </thead>
@@ -3880,20 +3810,11 @@ function VitaView() {
                                   <td style={{ padding: "8px 10px", color: "#94a3b8" }}>{i + 1}</td>
                                   <td style={{ padding: "8px 10px", fontWeight: 600, color: "#0f172a" }}>{b.name}</td>
                                   <td style={{ padding: "8px 10px", textAlign: "center" }}>{b.productCount}</td>
+                                  <td style={{ padding: "8px 10px", textAlign: "center" }}>{b.marketShare}%</td>
                                   <td style={{ padding: "8px 10px", textAlign: "center" }}>
-                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                                      <div style={{ width: 50, height: 5, background: "#f1f5f9", borderRadius: 3, overflow: "hidden" }}>
-                                        <div style={{ width: `${b.marketShare}%`, height: "100%", background: b.marketShare >= 20 ? "#ef4444" : b.marketShare >= 10 ? "#f59e0b" : "#10b981", borderRadius: 3 }} />
-                                      </div>
-                                      <span style={{ fontSize: 11 }}>{b.marketShare}%</span>
-                                    </div>
-                                  </td>
-                                  <td style={{ padding: "8px 10px", textAlign: "center" }}>
-                                    {b.potentialTrademark ? (
-                                      <span style={{ background: "#fef2f2", color: "#dc2626", padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 600 }}>Likely TM</span>
-                                    ) : (
-                                      <span style={{ background: "#ecfdf5", color: "#059669", padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 600 }}>Low Risk</span>
-                                    )}
+                                    <span style={{ background: b.potentialTrademark ? "#fef2f2" : "#ecfdf5", color: b.potentialTrademark ? "#dc2626" : "#059669", padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 600 }}>
+                                      {b.potentialTrademark ? "Likely TM" : "Low Risk"}
+                                    </span>
                                   </td>
                                 </tr>
                               ))}
@@ -3902,28 +3823,6 @@ function VitaView() {
                         </div>
                       </div>
                     )}
-
-                    {/* Opportunity Summary */}
-                    <div style={{ background: legalData.opportunities?.isFragmented ? "#ecfdf5" : "#fef2f2", border: `1px solid ${legalData.opportunities?.isFragmented ? "#a7f3d0" : "#fecaca"}`, borderRadius: 14, padding: 20 }}>
-                      <h4 style={{ fontSize: 14, fontWeight: 700, color: legalData.opportunities?.isFragmented ? "#059669" : "#dc2626", marginBottom: 10 }}>
-                        {legalData.opportunities?.isFragmented ? "\u2705 Market Opportunity" : "\u26A0\uFE0F Caution Required"}
-                      </h4>
-                      <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.6 }}>
-                        {legalData.opportunities?.isFragmented ? (
-                          <div>
-                            <strong>{legalData.opportunities.weakBrandsCount}</strong> weak brands (1-2 products) vs <strong>{legalData.opportunities.strongBrandsCount}</strong> strong brands (5+ products).
-                            This fragmented market has room for a new player to establish dominance.
-                            <br/>Recommendation: Target the {legalData.opportunities.weakBrandsCount} weak brand positions with a superior product.
-                          </div>
-                        ) : (
-                          <div>
-                            <strong>{legalData.opportunities.strongBrandsCount}</strong> strong brands dominate this market.
-                            High trademark density suggests existing IP protection.
-                            <br/>Recommendation: Differentiate with unique formulation, target under-served sub-niches, and verify trademarks before brand naming.
-                          </div>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>
