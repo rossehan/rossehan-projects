@@ -2019,7 +2019,7 @@ ${JSON.stringify(fdaData, null, 2)}
 
     const geminiRes = await httpsPost(
       'generativelanguage.googleapis.com',
-      `/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
       { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(geminiBody) },
       geminiBody
     );
@@ -2398,7 +2398,7 @@ ${JSON.stringify(contextData.marginData, null, 2)}
 
     const geminiRes = await httpsPost(
       'generativelanguage.googleapis.com',
-      `/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
       { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(geminiBody) },
       geminiBody
     );
