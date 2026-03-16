@@ -1633,14 +1633,20 @@ app.get('/api/legal-barrier', async (req, res) => {
   // 2. Trademark density estimation based on brand count
   const trademarkDensity = Math.min(100, Math.round(brandCount * 2));
 
-  // 3. Legal barrier score calculation
-  // High HHI = monopolistic = harder to enter
+  // [VitaView Fix] 3. Legal barrier score calculation
+  // High HHI = monopolistic = harder to enter (barrierScore 높을수록 진입 어려움)
   // High top brand share = dominant player = harder
   // Few brands = consolidated market = harder
-  const hhiScore = Math.min(100, Math.round(hhi / 100)); // 0-100
+  const hhiScore = Math.min(100, Math.round(hhi / 100)); // 0-100, 높을수록 독점적
   const dominanceScore = Math.min(100, Math.round(topBrandShare * 1.5));
   const consolidationScore = brandCount < 5 ? 90 : brandCount < 10 ? 70 : brandCount < 20 ? 50 : brandCount < 30 ? 30 : 10;
   const barrierScore = Math.round(hhiScore * 0.35 + dominanceScore * 0.35 + consolidationScore * 0.3);
+
+  // [VitaView Fix] Opportunity Score도 함께 계산 (문제 2 - 진입 기회 점수)
+  const opportunityResult = calculateOpportunityScore(
+    { catId: category, hhi, brandCount, topShare: topBrandShare, topBrandShare, topProducts: catData.topProducts || [] },
+    {} // barrier endpoint에서는 빠른 점수만
+  );
 
   // 4. Risk level determination
   let riskLevel, riskColor, riskAdvice;
@@ -1686,9 +1692,14 @@ app.get('/api/legal-barrier', async (req, res) => {
     riskLevel,
     riskColor,
     riskAdvice,
+    // [VitaView Fix] Opportunity Score 추가 (문제 2)
+    opportunityScore: opportunityResult.opportunityScore,
+    opportunityVerdict: opportunityResult.verdict,
+    opportunityBreakdown: opportunityResult.scoreBreakdown,
     metrics: {
       hhi,
       hhiScore,
+      hhiInterpretation: hhi < 1000 ? '분산된 시장 (진입 용이)' : hhi <= 1800 ? '보통' : hhi <= 2500 ? '집중된 시장' : '독점 시장 (진입 불가)',
       topBrandShare,
       dominanceScore,
       brandCount,
@@ -1834,6 +1845,374 @@ const HEALTH_CONCERNS = {
   muscle: { label: 'Muscle & Performance', categories: ['creatine', 'bcaa', 'glutamine', 'whey_protein', 'beta_alanine', 'citrulline', 'electrolytes', 'protein'], subreddits: ['supplements', 'Fitness', 'bodybuilding'] }
 };
 
+// ===== [VitaView Fix] BSR History Cache - 시장 불안정성 측정용 =====
+// BSR을 주기적으로 기록하여 변동 표준편차 계산 (문제 3)
+const bsrHistoryCache = {};  // { catId: { ranks: [{ rank, timestamp }], lastUpdated } }
+const BSR_HISTORY_CACHE_TTL = 60 * 60 * 1000; // 1시간 TTL
+
+// [VitaView Fix] BSR 변동폭 기록 함수
+function recordBSRSnapshot(catId, topProducts) {
+  if (!topProducts || topProducts.length === 0) return;
+  if (!bsrHistoryCache[catId]) {
+    bsrHistoryCache[catId] = { snapshots: [], lastUpdated: 0 };
+  }
+  const now = Date.now();
+  const ranks = topProducts.map(p => p.rank).filter(Boolean);
+  if (ranks.length > 0) {
+    bsrHistoryCache[catId].snapshots.push({ ranks, timestamp: now, avgRank: ranks.reduce((a, b) => a + b, 0) / ranks.length });
+    // 최대 24개 스냅샷 유지 (24시간치)
+    if (bsrHistoryCache[catId].snapshots.length > 24) {
+      bsrHistoryCache[catId].snapshots = bsrHistoryCache[catId].snapshots.slice(-24);
+    }
+    bsrHistoryCache[catId].lastUpdated = now;
+  }
+}
+
+// [VitaView Fix] BSR 변동 표준편차 계산
+function calculateBSRVolatility(catId) {
+  const history = bsrHistoryCache[catId];
+  if (!history || history.snapshots.length < 2) return { volatility: null, dataPoints: history?.snapshots?.length || 0 };
+  const avgRanks = history.snapshots.map(s => s.avgRank);
+  const mean = avgRanks.reduce((a, b) => a + b, 0) / avgRanks.length;
+  const variance = avgRanks.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / avgRanks.length;
+  const stdDev = Math.sqrt(variance);
+  // 변동계수(CV) = stdDev / mean * 100 - 평균 대비 변동률
+  const cv = mean > 0 ? (stdDev / mean) * 100 : 0;
+  return { volatility: Math.round(cv * 100) / 100, stdDev: Math.round(stdDev), mean: Math.round(mean), dataPoints: avgRanks.length };
+}
+
+// ===== [VitaView Fix] Opportunity Score 계산 시스템 (문제 2) =====
+// 5개 지표 기반, 총 100점 만점. 데이터 없으면 해당 항목 제외 후 재정규화
+function calculateOpportunityScore(categoryData, opts = {}) {
+  const { redditSentiment, googleTrendsData, youtubeData, suggestionsData } = opts;
+  const scores = {};
+  let totalMaxScore = 0;
+  let totalScore = 0;
+
+  // === A. 시장 접근성 점수 (30점) - HHI 기반 ===
+  // [VitaView Fix] HHI 낮을수록 높은 점수 (문제 1 반영)
+  const hhi = categoryData.hhi;
+  if (hhi != null && hhi !== undefined) {
+    let accessScore;
+    if (hhi < 1000) accessScore = 30;
+    else if (hhi <= 1800) accessScore = 20;
+    else if (hhi <= 2500) accessScore = 10;
+    else accessScore = 0;
+    scores.marketAccessibility = {
+      score: accessScore, maxScore: 30, available: true,
+      reason: hhi < 1000 ? `HHI ${hhi} - 분산된 시장, 진입 용이` :
+              hhi <= 1800 ? `HHI ${hhi} - 보통 수준의 시장 집중도` :
+              hhi <= 2500 ? `HHI ${hhi} - 집중된 시장, 주의 필요` :
+              `HHI ${hhi} - 독점 시장, 진입 극히 어려움`
+    };
+    totalMaxScore += 30;
+    totalScore += accessScore;
+  } else {
+    scores.marketAccessibility = { score: 0, maxScore: 30, available: false, reason: '데이터 없음' };
+  }
+
+  // === B. 소비자 불만 점수 (25점) - Reddit + YouTube 기반 ===
+  if (redditSentiment && redditSentiment.available) {
+    const negRatio = redditSentiment.negativeRatio || 0; // 0~100%
+    // 불만 비율이 높을수록 높은 점수 (= 개선 기회)
+    const dissatScore = Math.min(25, Math.round(negRatio * 0.5));
+    scores.consumerDissatisfaction = {
+      score: dissatScore, maxScore: 25, available: true,
+      reason: `Reddit 부정 언급 ${Math.round(negRatio)}%${redditSentiment.topComplaint ? `, 주요 불만: "${redditSentiment.topComplaint}"` : ''}`
+    };
+    totalMaxScore += 25;
+    totalScore += dissatScore;
+  } else {
+    scores.consumerDissatisfaction = { score: 0, maxScore: 25, available: false, reason: '데이터 없음' };
+  }
+
+  // === C. 트렌드 모멘텀 점수 (20점) - Google Trends 증가율 ===
+  if (googleTrendsData && googleTrendsData.available) {
+    const growthRate = googleTrendsData.growthRate || 0; // % 증가율
+    let trendScore;
+    if (growthRate > 50) trendScore = 20;
+    else if (growthRate >= 20) trendScore = 15;
+    else if (growthRate >= 0) trendScore = 10;
+    else trendScore = 0;
+    scores.trendMomentum = {
+      score: trendScore, maxScore: 20, available: true,
+      reason: growthRate > 0 ? `3개월 성장률 +${Math.round(growthRate)}%` : `3개월 성장률 ${Math.round(growthRate)}% (하락 추세)`
+    };
+    totalMaxScore += 20;
+    totalScore += trendScore;
+  } else {
+    scores.trendMomentum = { score: 0, maxScore: 20, available: false, reason: '데이터 없음' };
+  }
+
+  // === D. 진입 장벽 점수 (15점) - 특허/제조 ===
+  // USPTO 직접 API 없으므로 브랜드 수 + 시장 구조로 추정
+  const brandCount = categoryData.brandCount || 0;
+  const topShare = categoryData.topShare || categoryData.topBrandShare || 0;
+  if (brandCount > 0) {
+    // 브랜드 많고 상위 점유율 낮으면 = 진입장벽 낮음
+    let barrierScore = 0;
+    if (brandCount >= 20 && topShare < 20) barrierScore = 15;
+    else if (brandCount >= 10 && topShare < 35) barrierScore = 10;
+    else if (brandCount >= 5) barrierScore = 5;
+    else barrierScore = 0;
+    scores.entryBarrier = {
+      score: barrierScore, maxScore: 15, available: true,
+      reason: `${brandCount}개 브랜드, 1위 점유율 ${Math.round(topShare)}%${barrierScore >= 10 ? ' - 진입 장벽 낮음' : barrierScore >= 5 ? ' - 보통' : ' - 높은 진입 장벽'}`
+    };
+    totalMaxScore += 15;
+    totalScore += barrierScore;
+  } else {
+    scores.entryBarrier = { score: 0, maxScore: 15, available: false, reason: '데이터 없음' };
+  }
+
+  // === E. 수요 확인 점수 (10점) - Google Suggestions + YouTube 기반 ===
+  if ((suggestionsData && suggestionsData.available) || (youtubeData && youtubeData.available)) {
+    let demandScore = 0;
+    const sugCount = suggestionsData?.relatedCount || 0;
+    const ytViews = youtubeData?.avgViews || 0;
+    // Google Suggestions 연관 검색어 5개 이상이면 +5점
+    if (sugCount >= 5) demandScore += 5;
+    else if (sugCount >= 2) demandScore += 3;
+    // YouTube 평균 조회수 10만 이상이면 +5점
+    if (ytViews >= 100000) demandScore += 5;
+    else if (ytViews >= 10000) demandScore += 3;
+    else if (ytViews > 0) demandScore += 1;
+    demandScore = Math.min(10, demandScore);
+    scores.demandSignal = {
+      score: demandScore, maxScore: 10, available: true,
+      reason: `연관 검색어 ${sugCount}개, YouTube 평균 조회수 ${ytViews > 0 ? (ytViews / 1000).toFixed(0) + 'K' : 'N/A'}`
+    };
+    totalMaxScore += 10;
+    totalScore += demandScore;
+  } else {
+    scores.demandSignal = { score: 0, maxScore: 10, available: false, reason: '데이터 없음' };
+  }
+
+  // === BSR 변동폭 보조 지표 (보너스 - 문제 3) ===
+  const bsrVol = calculateBSRVolatility(categoryData.catId);
+  let bsrBonus = 0;
+  let bsrReason = '데이터 부족';
+  if (bsrVol.volatility !== null) {
+    // 변동계수 > 30% = 불안정 = 신규 진입 기회 (+5점 보너스)
+    if (bsrVol.volatility > 30) { bsrBonus = 5; bsrReason = `BSR 변동계수 ${bsrVol.volatility}% - 불안정 시장, 진입 기회`; }
+    else if (bsrVol.volatility > 15) { bsrBonus = 3; bsrReason = `BSR 변동계수 ${bsrVol.volatility}% - 보통`; }
+    else { bsrBonus = 0; bsrReason = `BSR 변동계수 ${bsrVol.volatility}% - 안정적 (기존 강자 유지)`; }
+  }
+  scores.bsrVolatility = { bonus: bsrBonus, reason: bsrReason, dataPoints: bsrVol.dataPoints };
+
+  // === 최종 점수: 데이터 있는 항목만으로 100점 만점 재정규화 ===
+  let normalizedScore;
+  if (totalMaxScore > 0) {
+    normalizedScore = Math.round((totalScore / totalMaxScore) * 100) + bsrBonus;
+    normalizedScore = Math.min(100, normalizedScore);
+  } else {
+    normalizedScore = 0;
+  }
+
+  // === 최종 판정 ===
+  let verdict;
+  if (normalizedScore >= 80) verdict = '🟢 지금 바로 진입하세요';
+  else if (normalizedScore >= 60) verdict = '🟡 6개월 후 재검토 추천';
+  else verdict = '🔴 이 시장은 피하세요';
+
+  return {
+    opportunityScore: normalizedScore,
+    verdict,
+    scoreBreakdown: scores,
+    rawTotal: totalScore,
+    rawMaxScore: totalMaxScore,
+    bsrBonus,
+    dataCompleteness: totalMaxScore > 0 ? Math.round((totalMaxScore / 100) * 100) + '%' : '0%'
+  };
+}
+
+// ===== [VitaView Fix] 진입 불가 필터 (문제 5) =====
+function checkEntryBlockers(categoryData, googleTrendsData) {
+  const blockedReasons = [];
+
+  // 1. HHI > 2500 = 사실상 독점 시장
+  if (categoryData.hhi > 2500) {
+    blockedReasons.push(`HHI ${categoryData.hhi} > 2500 - 독점 시장`);
+  }
+
+  // 2. 상위 3개 제품 BSR 전부 100 이하 = 대형 브랜드 완전 장악
+  const topProducts = categoryData.topProducts || [];
+  const top3Ranks = topProducts.slice(0, 3).map(p => p.rank).filter(Boolean);
+  if (top3Ranks.length >= 3 && top3Ranks.every(r => r <= 100)) {
+    blockedReasons.push(`상위 3개 제품 BSR 전부 100 이하 (${top3Ranks.join(', ')}) - 대형 브랜드 완전 장악`);
+  }
+
+  // 3. 브랜드 수 극소 + 1위 점유율 극고 = 특허/독점 유사 구조
+  const topShare = categoryData.topBrandShare || categoryData.topShare || 0;
+  const brandCount = categoryData.brandCount || 0;
+  if (brandCount <= 3 && topShare > 60) {
+    blockedReasons.push(`${brandCount}개 브랜드, 1위 점유율 ${Math.round(topShare)}% - 특허/독점 유사 구조`);
+  }
+
+  // 4. Google Trends 절대값 지속 하락 중
+  if (googleTrendsData && googleTrendsData.available && googleTrendsData.growthRate < -20) {
+    blockedReasons.push(`Google Trends ${Math.round(googleTrendsData.growthRate)}% 하락 - 수요 감소 추세`);
+  }
+
+  return blockedReasons;
+}
+
+// ===== [VitaView Fix] Reddit 부정 감성 분석 헬퍼 =====
+async function analyzeRedditSentiment(searchTerm) {
+  const negativeKeywords = ['bad', 'disappointed', 'waste', 'problem', 'issue', 'side effect', 'complaint', 'terrible', 'scam', 'overpriced', 'doesn\'t work', 'ineffective', 'nausea', 'stomach'];
+  try {
+    const result = await httpsGet('www.reddit.com',
+      `/search.json?q=${encodeURIComponent(searchTerm + ' supplement')}&sort=relevance&t=year&limit=25`,
+      { 'User-Agent': 'VitaView/1.0 (supplement research)' }
+    );
+    const posts = (result.data?.data?.children || []).filter(p => !p.data?.stickied);
+    if (posts.length === 0) return { available: false };
+    let negCount = 0;
+    let topComplaint = '';
+    let maxNegScore = 0;
+    posts.forEach(p => {
+      const text = (p.data.title + ' ' + (p.data.selftext || '')).toLowerCase();
+      negativeKeywords.forEach(kw => {
+        if (text.includes(kw)) {
+          negCount++;
+          if (p.data.score > maxNegScore) { maxNegScore = p.data.score; topComplaint = kw; }
+        }
+      });
+    });
+    const negativeRatio = (negCount / (posts.length * negativeKeywords.length)) * 100;
+    return { available: true, negativeRatio: Math.min(100, negativeRatio * 10), postsAnalyzed: posts.length, topComplaint };
+  } catch(e) { return { available: false, error: e.message }; }
+}
+
+// ===== [VitaView Fix] Google Trends 증가율 계산 헬퍼 =====
+async function fetchTrendGrowthRate(keyword) {
+  try {
+    const widgetUrl = `/trends/api/explore?hl=en-US&tz=240&req=${encodeURIComponent(JSON.stringify({
+      comparisonItem: [{ keyword, geo: 'US', time: 'today 6-m' }], category: 0, property: ''
+    }))}&tz=240`;
+    const widgetRes = await httpsGet('trends.google.com', widgetUrl, {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    });
+    let widgetData = typeof widgetRes.data === 'string' ? widgetRes.data : JSON.stringify(widgetRes.data);
+    widgetData = widgetData.replace(/^\)\]\}',?\n?/, '');
+    const parsed = JSON.parse(widgetData);
+    const timeWidget = parsed.widgets?.find(w => w.id === 'TIMESERIES');
+    if (!timeWidget) return { available: false };
+
+    const timeReq = encodeURIComponent(JSON.stringify(timeWidget.request));
+    const timeRes = await httpsGet('trends.google.com',
+      `/trends/api/widgetdata/multiline?hl=en-US&tz=240&req=${timeReq}&token=${timeWidget.token}`,
+      { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    );
+    let timeData = typeof timeRes.data === 'string' ? timeRes.data : JSON.stringify(timeRes.data);
+    timeData = timeData.replace(/^\)\]\}',?\n?/, '');
+    const timeParsed = JSON.parse(timeData);
+    const points = (timeParsed.default?.timelineData || []).map(p => p.value?.[0] || 0);
+    if (points.length < 8) return { available: false };
+
+    // 최근 3개월 vs 이전 3개월
+    const half = Math.floor(points.length / 2);
+    const older = points.slice(0, half);
+    const newer = points.slice(half);
+    const olderAvg = older.reduce((a, b) => a + b, 0) / older.length;
+    const newerAvg = newer.reduce((a, b) => a + b, 0) / newer.length;
+    const growthRate = olderAvg > 0 ? ((newerAvg - olderAvg) / olderAvg) * 100 : (newerAvg > 0 ? 100 : 0);
+    // 지속적 하락 체크 (최근 4주 모두 감소)
+    const last4 = points.slice(-4);
+    const isConsistentDecline = last4.length >= 4 && last4.every((v, i) => i === 0 || v <= last4[i - 1]);
+    return { available: true, growthRate, newerAvg, olderAvg, isConsistentDecline, currentValue: points[points.length - 1] };
+  } catch(e) { return { available: false, error: e.message }; }
+}
+
+// ===== [VitaView Fix] YouTube + Suggestions 수요 시그널 헬퍼 =====
+async function fetchDemandSignals(keyword) {
+  const result = { youtube: { available: false }, suggestions: { available: false } };
+  // Google Suggestions
+  try {
+    const sgRes = await httpsGet('suggestqueries.google.com',
+      `/complete/search?client=firefox&q=${encodeURIComponent(keyword + ' supplement')}`,
+      { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    );
+    const sgs = Array.isArray(sgRes.data) ? sgRes.data[1] || [] : [];
+    result.suggestions = { available: sgs.length > 0, relatedCount: sgs.length, terms: sgs.slice(0, 5) };
+  } catch(e) {}
+  // YouTube
+  if (YOUTUBE_API_KEY) {
+    try {
+      const searchRes = await httpsGet('www.googleapis.com',
+        `/youtube/v3/search?key=${YOUTUBE_API_KEY}&q=${encodeURIComponent(keyword + ' supplement review')}&type=video&order=viewCount&maxResults=5&part=snippet&publishedAfter=${new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString()}`,
+        {}
+      );
+      const videoIds = (searchRes.data?.items || []).map(i => i.id?.videoId).filter(Boolean);
+      if (videoIds.length > 0) {
+        const statsRes = await httpsGet('www.googleapis.com',
+          `/youtube/v3/videos?key=${YOUTUBE_API_KEY}&id=${videoIds.join(',')}&part=statistics`, {}
+        );
+        const views = (statsRes.data?.items || []).map(v => parseInt(v.statistics?.viewCount || 0));
+        const avgViews = views.length > 0 ? views.reduce((a, b) => a + b, 0) / views.length : 0;
+        result.youtube = { available: true, avgViews: Math.round(avgViews), videoCount: views.length };
+      }
+    } catch(e) {}
+  }
+  return result;
+}
+
+// ===== [VitaView Fix] 새 Opportunity Score API 엔드포인트 =====
+app.get('/api/opportunity-score', async (req, res) => {
+  if (!trendsCache?.categories) {
+    return res.status(503).json({ error: 'Data not loaded yet.' });
+  }
+  const category = req.query.category;
+  if (!category || !trendsCache.categories[category]) {
+    return res.json({ error: 'Invalid category', validCategories: Object.keys(trendsCache.categories) });
+  }
+
+  const catData = trendsCache.categories[category];
+  const keyword = (CATEGORY_KEYWORDS[category] || category.replace(/_/g, ' '));
+
+  // BSR 스냅샷 기록
+  recordBSRSnapshot(category, catData.topProducts);
+
+  // 병렬로 외부 데이터 수집
+  const [redditSentiment, googleTrendsData, demandSignals] = await Promise.all([
+    analyzeRedditSentiment(keyword),
+    fetchTrendGrowthRate(keyword),
+    fetchDemandSignals(keyword)
+  ]);
+
+  // Opportunity Score 계산
+  const catInput = {
+    catId: category,
+    hhi: catData.hhi,
+    brandCount: catData.brandCount || Object.keys(catData.brands || {}).length,
+    topShare: catData.topBrandShare,
+    topProducts: catData.topProducts || [],
+    topBrandShare: catData.topBrandShare
+  };
+
+  const scoreResult = calculateOpportunityScore(catInput, {
+    redditSentiment,
+    googleTrendsData,
+    suggestionsData: demandSignals.suggestions,
+    youtubeData: demandSignals.youtube
+  });
+
+  // 진입 불가 필터 체크
+  const blockedReasons = checkEntryBlockers(catInput, googleTrendsData);
+  if (blockedReasons.length > 0) {
+    scoreResult.verdict = `⛔ 진입 불가 - ${blockedReasons[0]}`;
+    scoreResult.blockedReasons = blockedReasons;
+  }
+
+  res.json({
+    category,
+    categoryName: keyword,
+    ...scoreResult,
+    bsrVolatility: calculateBSRVolatility(category),
+    dataFreshness: new Date().toISOString()
+  });
+});
+
 // ===== SMART RECOMMEND: User picks target, AI recommends 3 products with market sizing & ROI =====
 app.get('/api/ai-formulator/auto-recommend', async (req, res) => {
   if (!trendsCache?.categories) {
@@ -1852,11 +2231,12 @@ app.get('/api/ai-formulator/auto-recommend', async (req, res) => {
   const budget = parseInt(req.query.budget) || 10000;  // initial investment USD
 
   try {
-    // 1. Calculate Domination Scores for ALL categories
+    // [VitaView Fix] 1. 카테고리 기본 데이터 수집 + Opportunity Score 준비
     const catEntries = Object.entries(trendsCache.categories);
     const maxRev = Math.max(...catEntries.map(([,c]) => c.estimatedMonthlyRevenue || 0), 1);
     const maxSpread = Math.max(...catEntries.map(([,c]) => c.priceSpread || 0), 1);
 
+    // [VitaView Fix] 기본 카테고리 점수 계산 (HHI 방향 반전 적용)
     const scored = catEntries.map(([catId, c]) => {
       const hhi = c.hhi || 0;
       const topShare = c.topBrandShare || 0;
@@ -1867,22 +2247,18 @@ app.get('/api/ai-formulator/auto-recommend', async (req, res) => {
       const priceSpread = c.priceSpread || 0;
       const avgPrice = c.avgPrice || 0;
 
-      const fragmentationScore = Math.min(100, Math.max(0, 100 - (hhi / 100)));
-      const weakLeaderScore = Math.min(100, Math.max(0, 100 - topShare * 2));
-      const maxDPP = Math.max(...catEntries.map(([,cc]) => {
-        const tp = cc.totalProducts || 1;
-        return (cc.avgDailySales || 0) / Math.log10(tp + 1);
-      }), 1);
-      const demandPerProduct = totalProducts > 0 ? avgDailySales / Math.log10(totalProducts + 1) : 0;
-      const supplyDemandScore = Math.round((demandPerProduct / maxDPP) * 100);
-      const revenueScore = Math.round((revenue / maxRev) * 100);
-      const priceGapScore = Math.round((priceSpread / maxSpread) * 100);
+      // [VitaView Fix] BSR 스냅샷 기록 (문제 3)
+      recordBSRSnapshot(catId, c.topProducts);
 
-      const dominationScore = Math.round(
-        fragmentationScore * 0.25 + weakLeaderScore * 0.15 +
-        supplyDemandScore * 0.15 + revenueScore * 0.15 +
-        priceGapScore * 0.15 + 50 * 0.15
+      // [VitaView Fix] 빠른 Opportunity Score (외부 API 없이 SP-API 데이터만으로)
+      // 전체 카테고리에 대해 빠르게 계산 - 외부 데이터는 top 10에만 적용
+      const quickScore = calculateOpportunityScore(
+        { catId, hhi, brandCount, topShare, topBrandShare: topShare, topProducts: c.topProducts || [] },
+        {} // 외부 데이터 없이 빠른 점수
       );
+
+      // [VitaView Fix] 하위호환: dominationScore 유지 (= opportunityScore)
+      const dominationScore = quickScore.opportunityScore;
 
       const topBrandEntry = Object.entries(c.brands || {}).sort((a, b) => b[1].revenue - a[1].revenue)[0];
       const brandEntries = Object.entries(c.brands || {}).sort((a, b) => b[1].revenue - a[1].revenue);
@@ -1891,7 +2267,10 @@ app.get('/api/ai-formulator/auto-recommend', async (req, res) => {
       const top3Share = totalRev > 0 ? Math.round((top3Rev / totalRev) * 100) : 0;
 
       return {
-        catId, dominationScore, brandCount, totalProducts,
+        catId, dominationScore, opportunityScore: dominationScore,
+        scoreBreakdown: quickScore.scoreBreakdown,
+        verdict: quickScore.verdict,
+        brandCount, totalProducts,
         avgDailySales, revenue, avgPrice, priceSpread,
         hhi, topShare, top3Share,
         topBrand: topBrandEntry ? topBrandEntry[0] : 'N/A',
@@ -1912,8 +2291,47 @@ app.get('/api/ai-formulator/auto-recommend', async (req, res) => {
       if (relevantCategories.length === 0) relevantCategories = scored.slice(0, 10);
     }
 
+    // [VitaView Fix] 진입 불가 필터 적용 (문제 5)
+    const blockedCategories = [];
+    relevantCategories = relevantCategories.filter(cat => {
+      const blockers = checkEntryBlockers(
+        { hhi: cat.hhi, topBrandShare: cat.topShare, brandCount: cat.brandCount, topProducts: cat.topProducts },
+        null // Google Trends는 top10에서만 체크
+      );
+      if (blockers.length > 0) {
+        blockedCategories.push({ catId: cat.catId, blockedReasons: blockers, verdict: `⛔ 진입 불가 - ${blockers[0]}` });
+        return false;
+      }
+      return true;
+    });
+
     // 3. Build market context (top 10 relevant categories for broader analysis)
     const topCats = relevantCategories.slice(0, 10);
+
+    // [VitaView Fix] top 카테고리에 대해 외부 데이터 기반 정밀 Opportunity Score 계산
+    // 병렬로 Reddit 감성 + Google Trends + 수요 시그널 수집 (상위 3개만 - API 비용 절감)
+    const enrichedScores = {};
+    try {
+      const enrichPromises = topCats.slice(0, 3).map(async (cat) => {
+        const keyword = CATEGORY_KEYWORDS[cat.catId] || cat.catId.replace(/_/g, ' ');
+        const [redditSent, trendsData, demandSig] = await Promise.all([
+          analyzeRedditSentiment(keyword).catch(() => ({ available: false })),
+          fetchTrendGrowthRate(keyword).catch(() => ({ available: false })),
+          fetchDemandSignals(keyword).catch(() => ({ youtube: { available: false }, suggestions: { available: false } }))
+        ]);
+        const fullScore = calculateOpportunityScore(
+          { catId: cat.catId, hhi: cat.hhi, brandCount: cat.brandCount, topShare: cat.topShare, topBrandShare: cat.topShare, topProducts: cat.topProducts },
+          { redditSentiment: redditSent, googleTrendsData: trendsData, suggestionsData: demandSig.suggestions, youtubeData: demandSig.youtube }
+        );
+        // 추가 진입 불가 체크 (Google Trends 포함)
+        const extraBlockers = checkEntryBlockers(
+          { hhi: cat.hhi, topBrandShare: cat.topShare, brandCount: cat.brandCount, topProducts: cat.topProducts },
+          trendsData
+        );
+        enrichedScores[cat.catId] = { ...fullScore, blockedReasons: extraBlockers, trendsData, redditSentiment: redditSent };
+      });
+      await Promise.all(enrichPromises);
+    } catch(e) { console.log('[VitaView] Enrichment error (non-fatal):', e.message); }
 
     // 4. Map categories to health concerns
     const categoryConcernMap = {};
@@ -1953,23 +2371,31 @@ app.get('/api/ai-formulator/auto-recommend', async (req, res) => {
       }
     } catch(e) {}
 
-    // 7. Build context for Gemini
-    const marketContext = topCats.map(cat => ({
-      category: cat.catId,
-      dominationScore: cat.dominationScore,
-      brandCount: cat.brandCount,
-      totalProducts: cat.totalProducts,
-      avgDailySales: cat.avgDailySales,
-      monthlyRevenue: cat.revenue,
-      annualRevenue: cat.annualRevenue,
-      avgPrice: cat.avgPrice,
-      priceRange: `$${cat.minPrice} ~ $${cat.maxPrice}`,
-      hhi: cat.hhi,
-      topBrand: `${cat.topBrand} (${cat.topShare}%)`,
-      top3Share: cat.top3Share,
-      healthConcerns: categoryConcernMap[cat.catId]?.map(c => c.label) || [],
-      topProducts: cat.topProducts.slice(0, 3).map(p => `${p.brand} - ${p.title} ($${p.price}, Rank #${p.rank})`)
-    }));
+    // [VitaView Fix] 7. Build context for Gemini (Opportunity Score 포함)
+    const marketContext = topCats.map(cat => {
+      const enriched = enrichedScores[cat.catId];
+      return {
+        category: cat.catId,
+        // [VitaView Fix] dominationScore 유지 (하위호환) + opportunityScore 추가
+        dominationScore: cat.dominationScore,
+        opportunityScore: enriched?.opportunityScore || cat.opportunityScore,
+        verdict: enriched?.verdict || cat.verdict,
+        scoreBreakdown: enriched?.scoreBreakdown || cat.scoreBreakdown,
+        brandCount: cat.brandCount,
+        totalProducts: cat.totalProducts,
+        avgDailySales: cat.avgDailySales,
+        monthlyRevenue: cat.revenue,
+        annualRevenue: cat.annualRevenue,
+        avgPrice: cat.avgPrice,
+        priceRange: `$${cat.minPrice} ~ $${cat.maxPrice}`,
+        hhi: cat.hhi,
+        topBrand: `${cat.topBrand} (${cat.topShare}%)`,
+        top3Share: cat.top3Share,
+        bsrVolatility: calculateBSRVolatility(cat.catId),
+        healthConcerns: categoryConcernMap[cat.catId]?.map(c => c.label) || [],
+        topProducts: cat.topProducts.slice(0, 3).map(p => `${p.brand} - ${p.title} ($${p.price}, Rank #${p.rank})`)
+      };
+    });
 
     // Calculate total market size for relevant categories
     const totalAnnualMarket = topCats.reduce((sum, c) => sum + c.annualRevenue, 0);
@@ -2020,8 +2446,10 @@ ${JSON.stringify(fdaData, null, 2)}
 ## 전체 시장 요약:
 - 전체 분석 카테고리: ${scored.length}개
 - 해당 분야 카테고리: ${topCats.length}개
-- Easy Entry (70+): ${topCats.filter(s => s.dominationScore >= 70).length}개
-- Hard Entry (<50): ${topCats.filter(s => s.dominationScore < 50).length}개
+- 🟢 즉시 진입 (80점+): ${topCats.filter(s => (enrichedScores[s.catId]?.opportunityScore || s.opportunityScore) >= 80).length}개
+- 🟡 재검토 필요 (60-79점): ${topCats.filter(s => { const sc = enrichedScores[s.catId]?.opportunityScore || s.opportunityScore; return sc >= 60 && sc < 80; }).length}개
+- 🔴 진입 비추천 (60점 미만): ${topCats.filter(s => (enrichedScores[s.catId]?.opportunityScore || s.opportunityScore) < 60).length}개
+- ⛔ 진입 불가 (필터 차단): ${blockedCategories.length}개
 
 ## 미션: 3개의 차별화된 제품을 추천해줘.
 - 제품1: 프리미엄 전략 (고가, 고마진)
@@ -2113,6 +2541,7 @@ ${considerationList ? `특히 다음 사항을 우선적으로 고려해: ${cons
         aiResponse = { rawText: geminiRes.data.candidates[0].content.parts[0].text };
       }
 
+      // [VitaView Fix] 응답에 Opportunity Score + scoreBreakdown 포함 (문제 4)
       res.json({
         aiFormulation: aiResponse,
         userInputs: { targetMarket, targetAudience, considerations, preferredIngredients, formType, budget },
@@ -2120,13 +2549,19 @@ ${considerationList ? `특히 다음 사항을 우선적으로 고려해: ${cons
           totalCategories: scored.length,
           relevantCategories: topCats.length,
           totalAnnualMarket,
+          // [VitaView Fix] 각 카테고리에 opportunityScore, verdict, scoreBreakdown 포함
           categories: marketContext
         },
+        // [VitaView Fix] 진입 불가로 필터된 카테고리 목록 (문제 5)
+        blockedCategories: blockedCategories.length > 0 ? blockedCategories : undefined,
         dataSourcesSummary: {
           spApiCategories: scored.length,
           redditPosts: redditData.topPosts?.length || 0,
-          fdaIngredients: fdaData.length
+          fdaIngredients: fdaData.length,
+          enrichedWithOpportunityScore: Object.keys(enrichedScores).length,
+          blockedByFilter: blockedCategories.length
         },
+        dataFreshness: new Date().toISOString(),
         timestamp: new Date().toISOString()
       });
     } else {
