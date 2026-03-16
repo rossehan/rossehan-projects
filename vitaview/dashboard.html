@@ -1454,6 +1454,11 @@ function VitaView() {
               <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 14, padding: 24, textAlign: "center" }}>
                 <div style={{ fontSize: 18, fontWeight: 700, color: "#dc2626", marginBottom: 8 }}>오류 발생</div>
                 <div style={{ fontSize: 13, color: "#991b1b", marginBottom: 16 }}>{formulatorResult.message || formulatorResult.error}</div>
+                {formulatorResult.details && (
+                  <pre style={{ background: "#0f172a", color: "#fca5a5", borderRadius: 8, padding: 14, fontSize: 10, maxHeight: 300, overflow: "auto", whiteSpace: "pre-wrap", textAlign: "left", marginBottom: 16 }}>
+                    {JSON.stringify(formulatorResult.details, null, 2)}
+                  </pre>
+                )}
                 <button onClick={() => setFormulatorResult(null)} style={{ background: "#ef4444", border: "none", borderRadius: 8, padding: "8px 20px", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>다시 시도</button>
               </div>
             )}
