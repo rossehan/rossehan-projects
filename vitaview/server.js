@@ -1732,6 +1732,393 @@ app.get('/api/margin-calculator', async (req, res) => {
   });
 });
 
+// ===== AI SUPPLEMENT FORMULATOR =====
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+// Health concern -> supplement category mapping
+const HEALTH_CONCERNS = {
+  sleep: { label: 'Sleep & Relaxation', categories: ['melatonin', 'magnesium', 'valerian', 'l_theanine', 'five_htp', 'ashwagandha', 'rhodiola'], subreddits: ['supplements', 'insomnia', 'sleep', 'Biohackers'] },
+  immunity: { label: 'Immune Support', categories: ['vitaminC', 'vitaminD', 'zinc', 'elderberry', 'echinacea', 'quercetin', 'bovine_colostrum', 'sea_moss'], subreddits: ['supplements', 'nutrition', 'Biohackers'] },
+  gut: { label: 'Gut Health & Digestion', categories: ['probiotics', 'fiber', 'digestive_enzymes', 'psyllium_husk', 'berberine', 'glutamine'], subreddits: ['supplements', 'nutrition', 'ibs', 'Biohackers'] },
+  energy: { label: 'Energy & Focus', categories: ['vitaminB', 'coq10', 'l_carnitine', 'creatine', 'cordyceps', 'lions_mane', 'alpha_lipoic_acid', 'pqq'], subreddits: ['supplements', 'nootropics', 'Biohackers'] },
+  beauty: { label: 'Skin, Hair & Beauty', categories: ['collagen', 'biotin', 'hyaluronic_acid', 'keratin', 'vitaminE', 'astaxanthin'], subreddits: ['supplements', 'SkincareAddiction', 'Biohackers'] },
+  weight: { label: 'Weight Management', categories: ['greenTea', 'appleCiderVinegar', 'berberine', 'fiber', 'chromium', 'l_carnitine', 'inositol'], subreddits: ['supplements', 'loseit', 'Fitness', 'Biohackers'] },
+  joints: { label: 'Joint & Bone Health', categories: ['glucosamine', 'chondroitin', 'msm', 'calcium', 'vitaminD', 'vitaminK', 'bromelain', 'boron'], subreddits: ['supplements', 'Fitness', 'nutrition'] },
+  mens: { label: "Men's Health", categories: ['tongkat_ali', 'tribulus', 'shilajit', 'dhea', 'saw_palmetto', 'fenugreek', 'zinc', 'boron'], subreddits: ['supplements', 'Testosterone', 'Biohackers'] },
+  womens: { label: "Women's Health", categories: ['iron', 'folate', 'calcium', 'evening_primrose', 'black_cohosh', 'inositol', 'dim', 'vitaminD'], subreddits: ['supplements', 'PCOS', 'nutrition'] },
+  longevity: { label: 'Longevity & Anti-Aging', categories: ['nmn', 'resveratrol', 'nac', 'coq10', 'alpha_lipoic_acid', 'astaxanthin', 'pqq', 'quercetin'], subreddits: ['supplements', 'longevity', 'Biohackers', 'nootropics'] },
+  stress: { label: 'Stress & Mood', categories: ['ashwagandha', 'rhodiola', 'five_htp', 'l_theanine', 'magnesium', 'st_johns_wort', 'ginseng'], subreddits: ['supplements', 'anxiety', 'Biohackers', 'nootropics'] },
+  muscle: { label: 'Muscle & Performance', categories: ['creatine', 'bcaa', 'glutamine', 'whey_protein', 'beta_alanine', 'citrulline', 'electrolytes', 'protein'], subreddits: ['supplements', 'Fitness', 'bodybuilding'] }
+};
+
+// Step 1: Data Aggregation Pipeline
+app.get('/api/ai-formulator/context', async (req, res) => {
+  const concern = req.query.concern || 'sleep';
+  const concernData = HEALTH_CONCERNS[concern];
+  if (!concernData) return res.json({ error: 'Invalid concern. Valid: ' + Object.keys(HEALTH_CONCERNS).join(', ') });
+
+  const context = {
+    concern,
+    concernLabel: concernData.label,
+    timestamp: new Date().toISOString(),
+    spApiData: {},
+    redditData: {},
+    fdaData: {},
+    trendsData: {},
+    marginData: {}
+  };
+
+  // 1. SP-API: Market data + Pain points for relevant categories
+  if (trendsCache) {
+    for (const catId of concernData.categories.slice(0, 6)) {
+      const catData = trendsCache.categories?.[catId];
+      if (!catData) continue;
+      const avgPrice = catData.avgPrice || 0;
+      context.spApiData[catId] = {
+        avgPrice: +avgPrice.toFixed(2),
+        minPrice: catData.minPrice ? +catData.minPrice.toFixed(2) : null,
+        maxPrice: catData.maxPrice ? +catData.maxPrice.toFixed(2) : null,
+        totalProducts: catData.totalProducts || 0,
+        avgDailySales: catData.avgDailySales || 0,
+        topBrand: catData.topBrand || 'Unknown',
+        topBrandShare: catData.topBrandShare || 0,
+        brandCount: catData.brandCount || Object.keys(catData.brands || {}).length,
+        hhi: catData.hhi || 0,
+        topProducts: (catData.topProducts || []).slice(0, 3).map(p => ({
+          title: p.title, brand: p.brand, price: p.price, rank: p.rank,
+          dailySales: estimateDailySales(p.rank)
+        })),
+        targetCOGS: +(avgPrice * 0.33).toFixed(2),
+        estimatedMonthlyProfit: Math.round((catData.avgDailySales || 10) * 30 * avgPrice * 0.34)
+      };
+    }
+  }
+
+  // 2. Reddit: Trending ingredients + pain points from relevant subreddits
+  try {
+    const redditPosts = [];
+    const searchTerms = [
+      `${concernData.label} supplement`,
+      `best ${concern} supplement 2025`,
+      `${concern} supplement side effects`
+    ];
+    for (const query of searchTerms.slice(0, 2)) {
+      try {
+        const result = await httpsGet('www.reddit.com',
+          `/search.json?q=${encodeURIComponent(query)}&sort=relevance&t=month&limit=15`,
+          { 'User-Agent': 'VitaView/1.0 (supplement research)' }
+        );
+        (result.data?.data?.children || []).forEach(p => {
+          const d = p.data;
+          if (d && !d.stickied) {
+            redditPosts.push({
+              title: d.title, selftext: (d.selftext || '').slice(0, 400),
+              subreddit: d.subreddit, score: d.score, numComments: d.num_comments
+            });
+          }
+        });
+      } catch(e) {}
+      await new Promise(r => setTimeout(r, 1000));
+    }
+
+    // Extract trending ingredients from Reddit
+    const ingredientMentions = {};
+    const complaints = [];
+    const recommendations = [];
+
+    const complainKeywords = ['side effect', 'stomach', 'nausea', 'doesn\'t work', 'waste', 'too big', 'smell', 'taste awful', 'overpriced', 'fake', 'ineffective'];
+    const positiveKeywords = ['amazing', 'works great', 'recommend', 'life changing', 'best', 'game changer', 'finally found', 'love this'];
+
+    redditPosts.forEach(post => {
+      const text = (post.title + ' ' + post.selftext).toLowerCase();
+
+      // Count ingredient mentions
+      concernData.categories.forEach(catId => {
+        const name = catId.replace(/_/g, ' ').toLowerCase();
+        if (text.includes(name)) {
+          ingredientMentions[name] = (ingredientMentions[name] || 0) + 1;
+        }
+      });
+
+      // Extract complaints
+      complainKeywords.forEach(kw => {
+        if (text.includes(kw)) {
+          complaints.push({ keyword: kw, title: post.title.slice(0, 100), score: post.score });
+        }
+      });
+
+      // Extract positive mentions
+      positiveKeywords.forEach(kw => {
+        if (text.includes(kw)) {
+          recommendations.push({ keyword: kw, title: post.title.slice(0, 100), score: post.score });
+        }
+      });
+    });
+
+    context.redditData = {
+      postsAnalyzed: redditPosts.length,
+      trendingIngredients: Object.entries(ingredientMentions).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, mentions: count })),
+      topComplaints: complaints.sort((a, b) => b.score - a.score).slice(0, 5),
+      topRecommendations: recommendations.sort((a, b) => b.score - a.score).slice(0, 5),
+      rawTopPosts: redditPosts.sort((a, b) => b.score - a.score).slice(0, 5).map(p => ({ title: p.title, score: p.score, subreddit: p.subreddit }))
+    };
+  } catch(e) {
+    context.redditData = { error: e.message };
+  }
+
+  // 3. OpenFDA: Safety data for relevant ingredients
+  try {
+    const fdaResults = [];
+    for (const catId of concernData.categories.slice(0, 5)) {
+      const ingName = catId.replace(/_/g, ' ');
+      const cacheKey = ingName.toLowerCase();
+      if (fdaCache[cacheKey] && Date.now() - fdaCache[cacheKey].time < FDA_CACHE_TTL) {
+        fdaResults.push({ ingredient: ingName, ...fdaCache[cacheKey].data });
+        continue;
+      }
+      try {
+        const aeRes = await httpsGet('api.fda.gov', `/food/event.json?search=products.name_brand:"${encodeURIComponent(ingName)}"&limit=1`, {});
+        const recallRes = await httpsGet('api.fda.gov', `/food/enforcement.json?search=reason_for_recall:"${encodeURIComponent(ingName)}"&limit=1`, {});
+        const aeTotal = aeRes.data?.meta?.results?.total || 0;
+        const recallTotal = recallRes.data?.meta?.results?.total || 0;
+        const safety = calculateSafetyScore({ adverseEvents: { total: aeTotal }, recalls: { total: recallTotal } });
+        fdaResults.push({ ingredient: ingName, adverseEvents: aeTotal, recalls: recallTotal, safetyScore: safety });
+      } catch(e) {
+        fdaResults.push({ ingredient: ingName, adverseEvents: 0, recalls: 0, safetyScore: 95 });
+      }
+      await new Promise(r => setTimeout(r, 300));
+    }
+    context.fdaData = { ingredients: fdaResults };
+  } catch(e) {
+    context.fdaData = { error: e.message };
+  }
+
+  // 4. Google Trends: Consumer interest
+  try {
+    const trendSuggestions = [];
+    for (const catId of concernData.categories.slice(0, 3)) {
+      const q = CATEGORY_KEYWORDS[catId] || catId.replace(/_/g, ' ');
+      try {
+        const result = await httpsGet('suggestqueries.google.com',
+          `/complete/search?client=firefox&q=${encodeURIComponent(q + ' supplement')}`,
+          { 'User-Agent': 'Mozilla/5.0' }
+        );
+        const suggestions = Array.isArray(result.data) ? result.data[1] || [] : [];
+        trendSuggestions.push({ keyword: q, suggestions: suggestions.slice(0, 5) });
+      } catch(e) {}
+      await new Promise(r => setTimeout(r, 300));
+    }
+    context.trendsData = { googleSuggestions: trendSuggestions };
+  } catch(e) {
+    context.trendsData = { error: e.message };
+  }
+
+  // 5. Margin data for relevant categories
+  for (const catId of concernData.categories.slice(0, 6)) {
+    const catData = trendsCache?.categories?.[catId];
+    if (!catData || !catData.avgPrice) continue;
+    const avgPrice = catData.avgPrice;
+    context.marginData[catId] = {
+      avgPrice: +avgPrice.toFixed(2),
+      targetCOGS: +(avgPrice * 0.33).toFixed(2),
+      amazonFees: +(avgPrice * 0.33).toFixed(2),
+      profitPerUnit: +(avgPrice * 0.34).toFixed(2),
+      monthlyProfit: Math.round((catData.avgDailySales || 10) * 30 * avgPrice * 0.34),
+      viability: avgPrice * 0.33 >= 8 ? 'EXCELLENT' : avgPrice * 0.33 >= 5 ? 'GOOD' : avgPrice * 0.33 >= 3 ? 'FEASIBLE' : 'TIGHT'
+    };
+  }
+
+  res.json(context);
+});
+
+// Step 2: Gemini LLM Integration - The Formulator
+app.get('/api/ai-formulator/generate', async (req, res) => {
+  const concern = req.query.concern || 'sleep';
+
+  // First, get the aggregated context
+  let contextData;
+  try {
+    const contextUrl = `/api/ai-formulator/context?concern=${concern}`;
+    // Internal fetch - reuse the context logic
+    const contextReq = { query: { concern } };
+    const concernData = HEALTH_CONCERNS[concern];
+    if (!concernData) return res.json({ error: 'Invalid concern' });
+
+    // Build context inline (same as /context endpoint)
+    contextData = { concern, concernLabel: concernData.label, spApiData: {}, redditData: {}, fdaData: {}, trendsData: {}, marginData: {} };
+
+    // SP-API data
+    if (trendsCache) {
+      for (const catId of concernData.categories.slice(0, 6)) {
+        const catData = trendsCache.categories?.[catId];
+        if (!catData) continue;
+        const avgPrice = catData.avgPrice || 0;
+        contextData.spApiData[catId] = {
+          avgPrice: +avgPrice.toFixed(2), totalProducts: catData.totalProducts || 0,
+          avgDailySales: catData.avgDailySales || 0, topBrand: catData.topBrand || 'Unknown',
+          topBrandShare: catData.topBrandShare || 0, brandCount: Object.keys(catData.brands || {}).length,
+          hhi: catData.hhi || 0,
+          topProducts: (catData.topProducts || []).slice(0, 3).map(p => ({ title: p.title, brand: p.brand, price: p.price, rank: p.rank })),
+          targetCOGS: +(avgPrice * 0.33).toFixed(2)
+        };
+      }
+    }
+
+    // Reddit data
+    try {
+      const redditPosts = [];
+      const query = `${concernData.label} supplement`;
+      const result = await httpsGet('www.reddit.com',
+        `/search.json?q=${encodeURIComponent(query)}&sort=relevance&t=month&limit=20`,
+        { 'User-Agent': 'VitaView/1.0 (supplement research)' }
+      );
+      (result.data?.data?.children || []).forEach(p => {
+        const d = p.data;
+        if (d && !d.stickied) redditPosts.push({ title: d.title, selftext: (d.selftext || '').slice(0, 300), score: d.score });
+      });
+      contextData.redditData = {
+        topPosts: redditPosts.sort((a, b) => b.score - a.score).slice(0, 8).map(p => `[Score:${p.score}] ${p.title}`)
+      };
+    } catch(e) { contextData.redditData = { error: e.message }; }
+
+    // FDA data
+    try {
+      const fdaResults = [];
+      for (const catId of concernData.categories.slice(0, 4)) {
+        const ingName = catId.replace(/_/g, ' ');
+        try {
+          const aeRes = await httpsGet('api.fda.gov', `/food/event.json?search=products.name_brand:"${encodeURIComponent(ingName)}"&limit=1`, {});
+          fdaResults.push({ ingredient: ingName, adverseEvents: aeRes.data?.meta?.results?.total || 0 });
+        } catch(e) { fdaResults.push({ ingredient: ingName, adverseEvents: 0 }); }
+        await new Promise(r => setTimeout(r, 200));
+      }
+      contextData.fdaData = fdaResults;
+    } catch(e) {}
+
+    // Margin data
+    for (const catId of concernData.categories.slice(0, 6)) {
+      const catData = trendsCache?.categories?.[catId];
+      if (!catData) continue;
+      contextData.marginData[catId] = {
+        avgPrice: +(catData.avgPrice || 0).toFixed(2),
+        targetCOGS: +((catData.avgPrice || 0) * 0.33).toFixed(2),
+        monthlyProfit: Math.round((catData.avgDailySales || 10) * 30 * (catData.avgPrice || 0) * 0.34)
+      };
+    }
+
+  } catch(e) {
+    return res.status(500).json({ error: 'Context aggregation failed: ' + e.message });
+  }
+
+  // Build the formulator prompt
+  const systemPrompt = `You are a top Amazon FBA seller and a certified supplement formulator/pharmacist. You specialize in creating innovative dietary supplement products that dominate the Amazon marketplace.
+
+IMPORTANT: Always respond in Korean (한국어). Your response must follow the exact JSON format specified.`;
+
+  const userPrompt = `아래의 실시간 시장 데이터를 분석해서 아마존을 독점할 수 있는 혁신적인 영양제 신제품 기획안을 딱 1개 제안해.
+
+## 분석 대상: ${contextData.concernLabel}
+
+## 실시간 데이터:
+### 아마존 시장 데이터 (SP-API):
+${JSON.stringify(contextData.spApiData, null, 2)}
+
+### Reddit 소비자 트렌드:
+${JSON.stringify(contextData.redditData, null, 2)}
+
+### FDA 안전성 데이터:
+${JSON.stringify(contextData.fdaData, null, 2)}
+
+### 마진 분석 (1/3 법칙):
+${JSON.stringify(contextData.marginData, null, 2)}
+
+## 반드시 아래 JSON 형식으로 답변해:
+{
+  "productName": "제품명 (영어, 브랜드네임 느낌으로)",
+  "productNameKr": "제품명 한국어 설명",
+  "formType": "제형 (예: 리포조말 소프트젤, 구미, 분말 스틱 등)",
+  "tagline": "상세페이지 첫 줄에 들어갈 영어 카피라이팅 (한 줄)",
+  "targetAudience": "핵심 타겟 고객층 설명",
+  "ingredients": [
+    {"name": "성분명", "dosage": "용량", "reason": "이 성분을 넣는 이유 (데이터 근거 포함)"}
+  ],
+  "synergyExplanation": "성분 배합 시너지 설명 (왜 이 조합이 효과적인지)",
+  "competitorWeaknesses": [
+    {"weakness": "기존 제품 약점", "ourSolution": "우리 제품이 해결하는 방법"}
+  ],
+  "fdaSafetyReport": {
+    "riskLevel": "LOW/MEDIUM/HIGH",
+    "warnings": ["주의사항 1", "주의사항 2"],
+    "marketingDontSay": ["절대 쓰면 안 되는 마케팅 문구"],
+    "marketingCanSay": ["안전하게 쓸 수 있는 마케팅 문구"]
+  },
+  "pricingStrategy": {
+    "suggestedPrice": 가격숫자,
+    "targetCOGS": 원가숫자,
+    "estimatedMonthlyProfit": 월순이익숫자,
+    "reasoning": "가격 전략 이유"
+  },
+  "marketingCopy": {
+    "title": "아마존 상품 타이틀 (200자 이내 영어)",
+    "bulletPoints": ["불릿포인트 1", "불릿포인트 2", "불릿포인트 3", "불릿포인트 4", "불릿포인트 5"]
+  },
+  "whyThisWillDominate": "이 제품이 시장을 독점할 수 있는 핵심 이유 요약"
+}`;
+
+  // Call Gemini API
+  if (!GEMINI_API_KEY) {
+    return res.json({
+      error: 'GEMINI_API_KEY not set',
+      message: 'Gemini API 키가 필요합니다. .env 파일에 GEMINI_API_KEY=your_key를 추가해주세요.',
+      howToGet: 'https://aistudio.google.com/apikey 에서 무료로 발급 가능합니다.',
+      contextData
+    });
+  }
+
+  try {
+    const geminiBody = JSON.stringify({
+      contents: [{ parts: [{ text: systemPrompt + '\n\n' + userPrompt }] }],
+      generationConfig: {
+        temperature: 0.8,
+        maxOutputTokens: 4096,
+        responseMimeType: "application/json"
+      }
+    });
+
+    const geminiRes = await httpsPost(
+      'generativelanguage.googleapis.com',
+      `/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+      { 'Content-Type': 'application/json' },
+      geminiBody
+    );
+
+    if (geminiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      let aiResponse;
+      try {
+        aiResponse = JSON.parse(geminiRes.data.candidates[0].content.parts[0].text);
+      } catch(e) {
+        aiResponse = { rawText: geminiRes.data.candidates[0].content.parts[0].text };
+      }
+
+      res.json({
+        concern,
+        concernLabel: contextData.concernLabel,
+        aiFormulation: aiResponse,
+        dataSourcesSummary: {
+          spApiCategories: Object.keys(contextData.spApiData).length,
+          redditPosts: contextData.redditData?.topPosts?.length || 0,
+          fdaIngredients: contextData.fdaData?.length || 0
+        },
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.json({ error: 'Gemini response error', details: geminiRes.data, contextData });
+    }
+  } catch(e) {
+    res.status(500).json({ error: 'Gemini API call failed: ' + e.message, contextData });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 VitaView Backend running on http://localhost:${PORT}`);
   console.log(`📋 Mode: LIVE (SP-API direct HTTP)`);
