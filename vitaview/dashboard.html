@@ -355,6 +355,9 @@ function VitaView() {
   const [legalData, setLegalData] = useState(null);
   const [legalLoading, setLegalLoading] = useState(false);
   const [legalCategory, setLegalCategory] = useState("ashwagandha");
+  // Module 4: Margin Calculator
+  const [marginData, setMarginData] = useState(null);
+  const [marginLoading, setMarginLoading] = useState(false);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/health`)
@@ -391,6 +394,12 @@ function VitaView() {
       fetch(`${API_BASE}/api/trend-keywords`)
         .then(r => r.json()).then(d => { if (d.trendingKeywords) setGoogleTrends(d); })
         .catch(() => {}).finally(() => setGoogleTrendsLoading(false));
+    }
+    if (activeTab === "aiAnalysis" && aiDomSubTab === "margin" && !marginData && !marginLoading) {
+      setMarginLoading(true);
+      fetch(`${API_BASE}/api/margin-calculator`)
+        .then(r => r.json()).then(d => { if (d.products) setMarginData(d); })
+        .catch(() => {}).finally(() => setMarginLoading(false));
     }
     if (activeTab === "aiAnalysis" && aiDomSubTab === "longtail" && !longtailData && !longtailLoading) {
       setLongtailLoading(true);
@@ -1995,7 +2004,8 @@ function VitaView() {
                 ["trends", "\u{1F4C8} Trend Analysis"],
                 ["hashtags", "#\uFE0F\u20E3 Hashtag Discovery"],
                 ["longtail", "\u{1F50E} Longtail Keywords"],
-                ["legalBarrier", "\u{1F6E1}\uFE0F Legal Barrier"]
+                ["legalBarrier", "\u{1F6E1}\uFE0F Legal Barrier"],
+                ["margin", "\u{1F4B0} Margin Calculator"]
               ].map(([id, label]) => (
                 <button key={id} onClick={() => setAiDomSubTab(id)} style={{
                   background: aiDomSubTab === id ? "linear-gradient(135deg, #10b981, #3b82f6)" : "#fff",
@@ -3135,6 +3145,156 @@ function VitaView() {
                         )}
                       </div>
                     </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* MODULE 4: MARGIN CALCULATOR SUB-TAB */}
+            {aiDomSubTab === "margin" && (
+              <div>
+                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 24, marginBottom: 20 }}>
+                  <h3 style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>{"\u{1F4B0}"} 1/3 Rule Margin Calculator</h3>
+                  <p style={{ fontSize: 13, color: "#64748b", marginBottom: 4 }}>SP-API 판매가 기반 제조원가 역산 &amp; 수익성 필터링</p>
+                  <p style={{ fontSize: 11, color: "#94a3b8" }}>1/3 Rule: 판매가 = 제조원가(33%) + 아마존 수수료(33%) + 순이익(34%)</p>
+                </div>
+
+                {marginLoading && (
+                  <div style={{ textAlign: "center", padding: 60 }}>
+                    <div style={{ width: 40, height: 40, border: "3px solid rgba(16,185,129,0.2)", borderTopColor: "#10b981", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
+                    <div style={{ color: "#64748b" }}>Calculating margins for all categories...</div>
+                  </div>
+                )}
+
+                {marginData && !marginLoading && (
+                  <div>
+                    {/* Summary Cards */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 20 }}>
+                      <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 12, padding: 16, textAlign: "center" }}>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: "#10b981" }}>{marginData.products?.filter(p => p.viability === "EXCELLENT").length}</div>
+                        <div style={{ fontSize: 12, color: "#059669" }}>EXCELLENT Viability</div>
+                      </div>
+                      <div style={{ background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: 12, padding: 16, textAlign: "center" }}>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: "#3b82f6" }}>{marginData.products?.filter(p => p.viability === "GOOD").length}</div>
+                        <div style={{ fontSize: 12, color: "#2563eb" }}>GOOD Viability</div>
+                      </div>
+                      <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 12, padding: 16, textAlign: "center" }}>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: "#f59e0b" }}>{marginData.products?.filter(p => p.viability === "FEASIBLE").length}</div>
+                        <div style={{ fontSize: 12, color: "#d97706" }}>FEASIBLE</div>
+                      </div>
+                      <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: 16, textAlign: "center" }}>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: "#ef4444" }}>{marginData.products?.filter(p => p.viability === "TIGHT").length}</div>
+                        <div style={{ fontSize: 12, color: "#dc2626" }}>TIGHT Margin</div>
+                      </div>
+                    </div>
+
+                    {/* Main Table */}
+                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 20 }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 14 }}>All Categories - Ranked by Monthly Profit</h4>
+                      <div style={{ maxHeight: 600, overflowY: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                          <thead>
+                            <tr style={{ background: "#f8fafc", position: "sticky", top: 0 }}>
+                              <th style={{ padding: "8px 6px", textAlign: "left", color: "#64748b", fontSize: 11 }}>#</th>
+                              <th style={{ padding: "8px 6px", textAlign: "left", color: "#64748b", fontSize: 11 }}>Category</th>
+                              <th style={{ padding: "8px 6px", textAlign: "center", color: "#64748b", fontSize: 11 }}>Avg Price</th>
+                              <th style={{ padding: "8px 6px", textAlign: "center", color: "#64748b", fontSize: 11 }}>Target COGS</th>
+                              <th style={{ padding: "8px 6px", textAlign: "center", color: "#64748b", fontSize: 11 }}>Est. Profit/unit</th>
+                              <th style={{ padding: "8px 6px", textAlign: "center", color: "#64748b", fontSize: 11 }}>Monthly Profit</th>
+                              <th style={{ padding: "8px 6px", textAlign: "center", color: "#64748b", fontSize: 11 }}>Viability</th>
+                              <th style={{ padding: "8px 6px", textAlign: "center", color: "#64748b", fontSize: 11 }}>Alibaba</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {marginData.products?.map((p, i) => (
+                              <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                                <td style={{ padding: "10px 6px", color: "#94a3b8" }}>{i + 1}</td>
+                                <td style={{ padding: "10px 6px" }}>
+                                  <div style={{ fontWeight: 600, color: "#0f172a", textTransform: "capitalize" }}>
+                                    {(CATEGORIES.find(c => c.id === p.category) || {}).icon || ""} {p.categoryName}
+                                  </div>
+                                  <div style={{ fontSize: 10, color: "#94a3b8" }}>{p.projections?.avgDailySales} sales/day | {p.projections?.monthlyUnits} units/mo</div>
+                                </td>
+                                <td style={{ padding: "10px 6px", textAlign: "center", fontWeight: 600 }}>${p.pricing?.avgSellingPrice}</td>
+                                <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                                  <div style={{ fontWeight: 700, color: "#dc2626" }}>${p.oneThirdRule?.targetCOGS}</div>
+                                  <div style={{ fontSize: 9, color: "#94a3b8" }}>max sourcing</div>
+                                </td>
+                                <td style={{ padding: "10px 6px", textAlign: "center", fontWeight: 600, color: "#10b981" }}>${p.oneThirdRule?.estimatedProfit}</td>
+                                <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                                  <div style={{ fontWeight: 700, color: "#059669" }}>${p.projections?.monthlyProfit?.toLocaleString()}</div>
+                                  <div style={{ fontSize: 9, color: "#94a3b8" }}>${(p.projections?.annualProfit || 0).toLocaleString()}/yr</div>
+                                </td>
+                                <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                                  <span style={{ background: p.viabilityColor + "15", color: p.viabilityColor, padding: "3px 8px", borderRadius: 10, fontSize: 10, fontWeight: 700, border: `1px solid ${p.viabilityColor}30` }}>
+                                    {p.viability}
+                                  </span>
+                                </td>
+                                <td style={{ padding: "10px 6px", textAlign: "center" }}>
+                                  <a href={p.alibabaLink} target="_blank" rel="noopener noreferrer" style={{ display: "inline-block", background: "#f97316", color: "#fff", padding: "4px 10px", borderRadius: 6, fontSize: 10, fontWeight: 600, textDecoration: "none" }}>
+                                    ${p.oneThirdRule?.targetCOGS} or less
+                                  </a>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Top 5 Detailed Cards */}
+                    <h4 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 14 }}>{"\u{1F3AF}"} Top 5 Highest-Profit Categories - Detailed Breakdown</h4>
+                    {marginData.products?.slice(0, 5).map((p, i) => (
+                      <div key={i} style={{ background: "#fff", border: `2px solid ${p.viabilityColor}30`, borderRadius: 14, padding: 20, marginBottom: 16 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                          <div>
+                            <h4 style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", textTransform: "capitalize" }}>
+                              #{i + 1} {(CATEGORIES.find(c => c.id === p.category) || {}).icon || ""} {p.categoryName}
+                            </h4>
+                            <span style={{ fontSize: 12, color: "#94a3b8" }}>Price range: ${p.pricing?.minPrice} - ${p.pricing?.maxPrice}</span>
+                          </div>
+                          <span style={{ background: p.viabilityColor, color: "#fff", padding: "6px 16px", borderRadius: 20, fontSize: 12, fontWeight: 700 }}>{p.viability}</span>
+                        </div>
+
+                        {/* 1/3 Rule Breakdown */}
+                        <div style={{ display: "flex", gap: 0, marginBottom: 16, borderRadius: 10, overflow: "hidden", height: 36 }}>
+                          <div style={{ flex: 33, background: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, fontWeight: 600 }}>
+                            COGS ${p.oneThirdRule?.targetCOGS} (33%)
+                          </div>
+                          <div style={{ flex: 33, background: "#f59e0b", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, fontWeight: 600 }}>
+                            Fees ${p.oneThirdRule?.estimatedAmazonFees} (33%)
+                          </div>
+                          <div style={{ flex: 34, background: "#10b981", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, fontWeight: 600 }}>
+                            Profit ${p.oneThirdRule?.estimatedProfit} (34%)
+                          </div>
+                        </div>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 16 }}>
+                          <div style={{ background: "#f8fafc", borderRadius: 8, padding: 12, textAlign: "center" }}>
+                            <div style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>${p.pricing?.avgSellingPrice}</div>
+                            <div style={{ fontSize: 10, color: "#94a3b8" }}>Average Selling Price</div>
+                          </div>
+                          <div style={{ background: "#fef2f2", borderRadius: 8, padding: 12, textAlign: "center" }}>
+                            <div style={{ fontSize: 18, fontWeight: 700, color: "#dc2626" }}>${p.oneThirdRule?.targetCOGS}</div>
+                            <div style={{ fontSize: 10, color: "#dc2626" }}>Max Sourcing Cost</div>
+                          </div>
+                          <div style={{ background: "#ecfdf5", borderRadius: 8, padding: 12, textAlign: "center" }}>
+                            <div style={{ fontSize: 18, fontWeight: 700, color: "#059669" }}>${p.projections?.monthlyProfit?.toLocaleString()}/mo</div>
+                            <div style={{ fontSize: 10, color: "#059669" }}>Estimated Monthly Profit</div>
+                          </div>
+                        </div>
+
+                        {/* Action: Alibaba sourcing link */}
+                        <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, padding: 14, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ fontSize: 12, color: "#92400e" }}>
+                            이 제품을 독점하려면 알리바바에서 <strong>${p.oneThirdRule?.targetCOGS} 이하</strong>에 소싱해야 함
+                          </div>
+                          <a href={p.alibabaLink} target="_blank" rel="noopener noreferrer" style={{ background: "linear-gradient(135deg, #f97316, #ef4444)", color: "#fff", padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}>
+                            {"\u{1F6D2}"} Search Alibaba
+                          </a>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

@@ -1625,6 +1625,113 @@ app.get('/api/legal-barrier', async (req, res) => {
   });
 });
 
+// ===== MODULE 4: 1/3 Rule Margin Calculator =====
+app.get('/api/margin-calculator', async (req, res) => {
+  if (!trendsCache) return res.json({ error: 'Trends data not loaded yet.' });
+
+  const requestedCategory = req.query.category;
+  const categories = trendsCache.categories || {};
+  const categoryIds = requestedCategory ? [requestedCategory] : Object.keys(categories);
+
+  const results = [];
+
+  for (const catId of categoryIds) {
+    const catData = categories[catId];
+    if (!catData || !catData.avgPrice) continue;
+
+    const avgPrice = catData.avgPrice;
+    const minPrice = catData.minPrice || avgPrice * 0.5;
+    const maxPrice = catData.maxPrice || avgPrice * 1.5;
+
+    // 1/3 Rule: Selling Price = Manufacturing + Amazon Fees + Profit (each ~33%)
+    const targetCOGS = +(avgPrice * 0.33).toFixed(2);           // Cost of Goods Sold (33%)
+    const estimatedAmazonFees = +(avgPrice * 0.33).toFixed(2);  // Amazon FBA + referral (~33%)
+    const estimatedProfit = +(avgPrice * 0.34).toFixed(2);      // Net profit (~34%)
+
+    // Premium segment analysis
+    const premiumPrice = maxPrice;
+    const premiumCOGS = +(premiumPrice * 0.33).toFixed(2);
+    const premiumProfit = +(premiumPrice * 0.34).toFixed(2);
+
+    // Budget entry point
+    const budgetPrice = minPrice;
+    const budgetCOGS = +(budgetPrice * 0.33).toFixed(2);
+
+    // Revenue projections
+    const avgDailySales = catData.avgDailySales || 10;
+    const monthlyUnits = avgDailySales * 30;
+    const monthlyRevenue = +(monthlyUnits * avgPrice).toFixed(0);
+    const monthlyProfit = +(monthlyUnits * estimatedProfit).toFixed(0);
+
+    // Viability rating
+    let viability, viabilityColor;
+    if (targetCOGS >= 8) {
+      viability = 'EXCELLENT';
+      viabilityColor = '#10b981';
+    } else if (targetCOGS >= 5) {
+      viability = 'GOOD';
+      viabilityColor = '#3b82f6';
+    } else if (targetCOGS >= 3) {
+      viability = 'FEASIBLE';
+      viabilityColor = '#f59e0b';
+    } else {
+      viability = 'TIGHT';
+      viabilityColor = '#ef4444';
+    }
+
+    const catName = catId.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim().toLowerCase();
+    const searchTerm = CATEGORY_KEYWORDS[catId] || catName;
+
+    results.push({
+      category: catId,
+      categoryName: catName,
+      pricing: {
+        avgSellingPrice: +avgPrice.toFixed(2),
+        minPrice: +minPrice.toFixed(2),
+        maxPrice: +maxPrice.toFixed(2),
+        priceSpread: catData.priceSpread || +(maxPrice - minPrice).toFixed(2)
+      },
+      oneThirdRule: {
+        targetCOGS,
+        estimatedAmazonFees,
+        estimatedProfit,
+        cogsPercentage: 33,
+        feesPercentage: 33,
+        profitPercentage: 34
+      },
+      premium: {
+        price: +premiumPrice.toFixed(2),
+        targetCOGS: premiumCOGS,
+        profit: premiumProfit
+      },
+      budget: {
+        price: +budgetPrice.toFixed(2),
+        targetCOGS: budgetCOGS
+      },
+      projections: {
+        avgDailySales,
+        monthlyUnits,
+        monthlyRevenue,
+        monthlyProfit,
+        annualProfit: monthlyProfit * 12
+      },
+      viability,
+      viabilityColor,
+      alibabaLink: `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(searchTerm)}`,
+      alibaba1688Link: `https://s.1688.com/selloffer/offer_search.htm?keywords=${encodeURIComponent(searchTerm)}`
+    });
+  }
+
+  // Sort by monthly profit descending
+  results.sort((a, b) => b.projections.monthlyProfit - a.projections.monthlyProfit);
+
+  res.json({
+    products: results,
+    totalAnalyzed: results.length,
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 VitaView Backend running on http://localhost:${PORT}`);
   console.log(`📋 Mode: LIVE (SP-API direct HTTP)`);
