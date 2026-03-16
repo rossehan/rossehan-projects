@@ -340,6 +340,13 @@ function VitaView() {
   const [formulatorResult, setFormulatorResult] = useState(null);
   const [formulatorLoading, setFormulatorLoading] = useState(false);
   const [showRawData, setShowRawData] = useState(false);
+  const [fTargetMarket, setFTargetMarket] = useState('');
+  const [fIngredients, setFIngredients] = useState('');
+  const [fFormType, setFFormType] = useState('');
+  const [fBudget, setFBudget] = useState(10000);
+  const [fSelectedProduct, setFSelectedProduct] = useState(0);
+  const [fCustomBudget, setFCustomBudget] = useState(10000);
+  const [fCustomSharePct, setFCustomSharePct] = useState(1);
 
   // Market Intelligence states (legacy, kept for data)
   const [miSubTab, setMiSubTab] = useState("overview");
@@ -1388,50 +1395,121 @@ function VitaView() {
         {/* AI SUPPLEMENT FORMULATOR TAB - AUTO RECOMMEND */}
         {activeTab === "marketIntel" && (
           <div>
-            {/* Header + CTA */}
+            {/* ═══ INPUT FORM: Target Market Selection ═══ */}
             {!formulatorResult && !formulatorLoading && (
-              <div style={{ textAlign: "center", padding: "60px 20px" }}>
-                <div style={{ fontSize: 60, marginBottom: 20 }}>🤖</div>
-                <h1 style={{ fontSize: 32, fontWeight: 800, color: "#0f172a", marginBottom: 12 }}>AI가 답을 알려드립니다</h1>
-                <p style={{ fontSize: 16, color: "#64748b", marginBottom: 8, maxWidth: 500, margin: "0 auto 8px" }}>
-                  아마존 전체 건기식 시장 데이터를 분석해서
-                </p>
-                <p style={{ fontSize: 18, fontWeight: 700, color: "#6366f1", marginBottom: 32 }}>
-                  "지금 당장 이 제품을 만들어라" 를 알려드립니다
-                </p>
-                <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginBottom: 28 }}>
-                  {[
-                    ["📊", "SP-API", `${Object.keys(trends?.categories || {}).length}개 카테고리`],
-                    ["💬", "Reddit", "소비자 불만"],
-                    ["🏥", "FDA", "안전성 검증"],
-                    ["🧠", "Gemini AI", "최종 분석"]
-                  ].map(([icon, label, desc], i) => (
-                    <div key={i} style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "10px 16px", minWidth: 120 }}>
-                      <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a" }}>{label}</div>
-                      <div style={{ fontSize: 10, color: "#94a3b8" }}>{desc}</div>
-                    </div>
-                  ))}
+              <div style={{ maxWidth: 800, margin: "0 auto", padding: "30px 20px" }}>
+                <div style={{ textAlign: "center", marginBottom: 32 }}>
+                  <div style={{ fontSize: 48, marginBottom: 12 }}>{"\u{1F3AF}"}</div>
+                  <h1 style={{ fontSize: 28, fontWeight: 800, color: "#0f172a", marginBottom: 8 }}>어떤 제품을 만들고 싶으세요?</h1>
+                  <p style={{ fontSize: 14, color: "#64748b" }}>타겟 시장과 선호 조건을 선택하면, AI가 3가지 전략의 제품을 추천합니다</p>
                 </div>
-                <button onClick={() => {
-                  setFormulatorResult(null);
-                  setFormulatorLoading(true);
-                  setShowRawData(false);
-                  fetch(`${API_BASE}/api/ai-formulator/auto-recommend`)
-                    .then(r => r.json())
-                    .then(d => setFormulatorResult(d))
-                    .catch(e => setFormulatorResult({ error: e.message }))
-                    .finally(() => setFormulatorLoading(false));
-                }} style={{
-                  background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                  border: "none", borderRadius: 14, padding: "18px 48px", color: "#fff",
-                  fontSize: 18, fontWeight: 800, cursor: "pointer",
-                  boxShadow: "0 8px 24px rgba(99,102,241,0.4)",
-                  transition: "all 0.2s"
-                }}>
-                  🚀 지금 바로 분석 시작
-                </button>
-                <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 12 }}>약 15-30초 소요 | Powered by Gemini 2.0 Flash</div>
+
+                {/* Target Market Grid */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 10 }}>{"\u{1F30D}"} 타겟 시장 선택</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                    {[
+                      ["sleep", "\u{1F319}", "수면/릴렉스"],
+                      ["immunity", "\u{1F6E1}\uFE0F", "면역력"],
+                      ["gut", "\u{1F9A0}", "장건강"],
+                      ["energy", "\u26A1", "에너지/집중"],
+                      ["beauty", "\u2728", "뷰티/피부"],
+                      ["weight", "\u{1F525}", "체중관리"],
+                      ["joints", "\u{1F9B4}", "관절/뼈"],
+                      ["mens", "\u{1F4AA}", "남성건강"],
+                      ["womens", "\u{1F338}", "여성건강"],
+                      ["longevity", "\u{1F331}", "장수/항노화"],
+                      ["stress", "\u{1F9D8}", "스트레스"],
+                      ["muscle", "\u{1F3CB}\uFE0F", "근육/퍼포먼스"]
+                    ].map(([key, icon, label]) => (
+                      <button key={key} onClick={() => setFTargetMarket(fTargetMarket === key ? '' : key)} style={{
+                        padding: "12px 8px", borderRadius: 10, cursor: "pointer", textAlign: "center",
+                        background: fTargetMarket === key ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "#fff",
+                        border: fTargetMarket === key ? "2px solid #6366f1" : "1px solid #e2e8f0",
+                        color: fTargetMarket === key ? "#fff" : "#334155", transition: "all 0.2s"
+                      }}>
+                        <div style={{ fontSize: 22, marginBottom: 4 }}>{icon}</div>
+                        <div style={{ fontSize: 11, fontWeight: 600 }}>{label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Preferred Ingredients */}
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>{"\u{1F9EA}"} 선호 원료 (선택사항)</div>
+                  <input type="text" value={fIngredients} onChange={e => setFIngredients(e.target.value)}
+                    placeholder="예: ashwagandha, magnesium, vitamin D (쉼표로 구분)"
+                    style={{ width: "100%", padding: "12px 16px", borderRadius: 10, border: "1px solid #e2e8f0", fontSize: 14, outline: "none", boxSizing: "border-box" }}
+                  />
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>비워두면 AI가 최적 원료를 추천합니다</div>
+                </div>
+
+                {/* Form Type */}
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>{"\u{1F48A}"} 선호 제형 (선택사항)</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {[
+                      ["", "AI 추천"],
+                      ["capsule", "캡슐"],
+                      ["softgel", "소프트젤"],
+                      ["gummy", "구미"],
+                      ["powder", "분말/스틱"],
+                      ["liquid", "액상"],
+                      ["tablet", "타블렛"]
+                    ].map(([key, label]) => (
+                      <button key={key} onClick={() => setFFormType(key)} style={{
+                        padding: "8px 16px", borderRadius: 20, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                        background: fFormType === key ? "#6366f1" : "#f8fafc",
+                        color: fFormType === key ? "#fff" : "#64748b",
+                        border: fFormType === key ? "1px solid #6366f1" : "1px solid #e2e8f0"
+                      }}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Budget */}
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>{"\u{1F4B0}"} 초기 투자 예산</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {[5000, 10000, 20000, 50000].map(amt => (
+                      <button key={amt} onClick={() => setFBudget(amt)} style={{
+                        padding: "10px 20px", borderRadius: 10, cursor: "pointer", fontSize: 13, fontWeight: 700,
+                        background: fBudget === amt ? "#0f172a" : "#f8fafc",
+                        color: fBudget === amt ? "#fff" : "#334155",
+                        border: fBudget === amt ? "1px solid #0f172a" : "1px solid #e2e8f0"
+                      }}>${amt.toLocaleString()}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Submit */}
+                <div style={{ textAlign: "center" }}>
+                  <button onClick={() => {
+                    setFormulatorResult(null);
+                    setFormulatorLoading(true);
+                    setShowRawData(false);
+                    setFSelectedProduct(0);
+                    const params = new URLSearchParams();
+                    if (fTargetMarket) params.set('targetMarket', fTargetMarket);
+                    if (fIngredients) params.set('ingredients', fIngredients);
+                    if (fFormType) params.set('formType', fFormType);
+                    params.set('budget', fBudget);
+                    fetch(`${API_BASE}/api/ai-formulator/auto-recommend?${params}`)
+                      .then(r => r.json())
+                      .then(d => setFormulatorResult(d))
+                      .catch(e => setFormulatorResult({ error: e.message }))
+                      .finally(() => setFormulatorLoading(false));
+                  }} style={{
+                    background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                    border: "none", borderRadius: 14, padding: "18px 56px", color: "#fff",
+                    fontSize: 18, fontWeight: 800, cursor: "pointer",
+                    boxShadow: "0 8px 24px rgba(99,102,241,0.4)"
+                  }}>
+                    {"\u{1F680}"} 3개 제품 추천받기
+                  </button>
+                  <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 10 }}>SP-API + Reddit + FDA + Gemini AI 종합 분석 | 약 20-40초</div>
+                </div>
               </div>
             )}
 
@@ -1439,237 +1517,375 @@ function VitaView() {
             {formulatorLoading && (
               <div style={{ textAlign: "center", padding: 80, background: "linear-gradient(135deg, #0f172a, #1e293b)", borderRadius: 18, color: "#fff" }}>
                 <div style={{ width: 70, height: 70, border: "4px solid rgba(99,102,241,0.2)", borderTopColor: "#a5b4fc", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 24px" }} />
-                <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>AI가 전체 시장을 분석하고 있습니다</div>
-                <div style={{ display: "flex", gap: 20, justifyContent: "center", marginTop: 20, flexWrap: "wrap" }}>
-                  {["📊 SP-API 데이터 수집", "💬 Reddit 불만 분석", "🏥 FDA 안전성 확인", "🧠 AI 최종 판단"].map((step, i) => (
+                <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>AI가 맞춤형 제품을 설계하고 있습니다</div>
+                <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 20, flexWrap: "wrap" }}>
+                  {["\u{1F4CA} 시장 데이터 분석", "\u{1F4AC} 소비자 니즈 파악", "\u{1F3E5} FDA 안전성 확인", "\u{1F9E0} 3개 제품 설계 중"].map((step, i) => (
                     <div key={i} style={{ fontSize: 12, color: "#94a3b8", padding: "6px 14px", background: "rgba(255,255,255,0.05)", borderRadius: 8 }}>{step}</div>
                   ))}
                 </div>
-                <div style={{ fontSize: 12, color: "#475569", marginTop: 20 }}>Powered by Gemini 2.0 Flash</div>
               </div>
             )}
 
             {/* Error state */}
             {formulatorResult && formulatorResult.error && !formulatorResult.aiFormulation && (
               <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 14, padding: 24, textAlign: "center" }}>
-                <div style={{ fontSize: 18, fontWeight: 700, color: "#dc2626", marginBottom: 8 }}>오류 발생</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: "#dc2626", marginBottom: 8 }}>{"\u274C"} 오류 발생</div>
                 <div style={{ fontSize: 13, color: "#991b1b", marginBottom: 16 }}>{formulatorResult.message || formulatorResult.error}</div>
                 {formulatorResult.details && (
                   <pre style={{ background: "#0f172a", color: "#fca5a5", borderRadius: 8, padding: 14, fontSize: 10, maxHeight: 300, overflow: "auto", whiteSpace: "pre-wrap", textAlign: "left", marginBottom: 16 }}>
                     {JSON.stringify(formulatorResult.details, null, 2)}
                   </pre>
                 )}
-                <button onClick={() => setFormulatorResult(null)} style={{ background: "#ef4444", border: "none", borderRadius: 8, padding: "8px 20px", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>다시 시도</button>
+                <button onClick={() => setFormulatorResult(null)} style={{ background: "#ef4444", border: "none", borderRadius: 8, padding: "8px 20px", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>다시 설정하기</button>
               </div>
             )}
 
-            {/* AI Formulation Result - ONE-PAGER */}
+            {/* ═══ RESULTS: 3 Product Recommendations ═══ */}
             {formulatorResult && formulatorResult.aiFormulation && !formulatorLoading && (() => {
-              const f = formulatorResult.aiFormulation;
-              const tlColor = f.fdaTrafficLight === "GREEN" ? "#10b981" : f.fdaTrafficLight === "YELLOW" ? "#f59e0b" : f.fdaTrafficLight === "RED" ? "#ef4444" : "#94a3b8";
-              const tlBg = f.fdaTrafficLight === "GREEN" ? "#ecfdf5" : f.fdaTrafficLight === "YELLOW" ? "#fffbeb" : f.fdaTrafficLight === "RED" ? "#fef2f2" : "#f8fafc";
-              const vmScore = f.viralMomentumScore || 0;
-              const vmColor = vmScore >= 70 ? "#10b981" : vmScore >= 40 ? "#f59e0b" : "#ef4444";
-              const mo = formulatorResult.marketOverview;
+              const ai = formulatorResult.aiFormulation;
+              const recs = ai.recommendations || [];
+              const mkt = ai.marketOverall || {};
+              const md = formulatorResult.marketData || {};
+              const sel = recs[fSelectedProduct] || recs[0] || {};
+
+              // ROI Calculator with custom inputs
+              const customMonthlyUnits = sel.marketSizing?.projectedMonthlyUnits || 500;
+              const customPrice = sel.pricingStrategy?.suggestedPrice || 25;
+              const customCOGS = sel.pricingStrategy?.targetCOGS || 8;
+              const customMonthlyRev = customMonthlyUnits * customPrice;
+              const customMonthlyCost = customMonthlyUnits * customCOGS;
+              const customMonthlyProfit = customMonthlyRev - customMonthlyCost;
+              const userBreakEven = fCustomBudget > 0 && customMonthlyProfit > 0 ? Math.ceil(fCustomBudget / customMonthlyProfit) : 99;
+              const userYearROI = fCustomBudget > 0 ? Math.round(((customMonthlyProfit * 12 - fCustomBudget) / fCustomBudget) * 100) : 0;
+
+              // Market share calculation
+              const annualMarket = sel.marketSizing?.annualMarketSize || md.totalAnnualMarket || 1;
+              const userAnnualRev = (customMonthlyRev * 12 * fCustomSharePct) / 100;
+
+              const strategyColors = { PREMIUM: "#8b5cf6", VALUE: "#3b82f6", NICHE: "#10b981" };
+              const strategyIcons = { PREMIUM: "\u{1F451}", VALUE: "\u{1F4B0}", NICHE: "\u{1F48E}" };
+              const strategyLabels = { PREMIUM: "\uD504\uB9AC\uBBF8\uC5C4", VALUE: "\uAC00\uC131\uBE44", NICHE: "\uD2C8\uC0C8" };
+
               return (
                 <div>
-                  {/* ═══ VERDICT BANNER ═══ */}
-                  <div style={{ background: "linear-gradient(135deg, #059669, #10b981)", borderRadius: 14, padding: "16px 24px", marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ color: "#fff" }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: 1 }}>AI VERDICT</span>
-                      <div style={{ fontSize: 16, fontWeight: 800 }}>
-                        {mo ? `${mo.totalCategories}개 카테고리 분석 완료` : "분석 완료"} → 이 제품을 만드세요
-                      </div>
+                  {/* Back + Market Overview Banner */}
+                  <div style={{ background: "linear-gradient(135deg, #0f172a, #1e293b)", borderRadius: 14, padding: "20px 24px", marginBottom: 16, color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#a78bfa", fontWeight: 600, letterSpacing: 1 }}>AI PRODUCT STRATEGY</div>
+                      <div style={{ fontSize: 18, fontWeight: 800 }}>{md.relevantCategories || ''}개 카테고리 분석 {"\u2192"} 3개 제품 추천</div>
+                      {mkt.bestOpportunity && <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>{mkt.bestOpportunity}</div>}
                     </div>
-                    <button onClick={() => setFormulatorResult(null)} style={{ background: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 8, padding: "8px 16px", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                      다시 분석
-                    </button>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <div style={{ background: "rgba(99,102,241,0.2)", borderRadius: 10, padding: "10px 16px", textAlign: "center" }}>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: "#a5b4fc" }}>${(md.totalAnnualMarket || 0).toLocaleString()}</div>
+                        <div style={{ fontSize: 9, color: "#94a3b8" }}>연간 시장규모</div>
+                      </div>
+                      <button onClick={() => { setFormulatorResult(null); }} style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 8, padding: "8px 14px", color: "#fff", fontSize: 11, fontWeight: 600, cursor: "pointer", alignSelf: "center" }}>
+                        {"\u{1F519}"} 다시 설정
+                      </button>
+                    </div>
                   </div>
 
-                  {/* ═══ HERO: Product Name & Form ═══ */}
-                  <div style={{ background: "linear-gradient(135deg, #0f172a, #1e293b)", borderRadius: 18, padding: "36px 32px", marginBottom: 20, color: "#fff", position: "relative", overflow: "hidden" }}>
-                    <div style={{ position: "absolute", top: -40, right: -40, width: 180, height: 180, background: "radial-gradient(circle, rgba(99,102,241,0.12), transparent)", borderRadius: "50%" }} />
-                    <div style={{ fontSize: 11, color: "#a78bfa", fontWeight: 600, letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>🤖 AI가 선택한 넥스트 히트 건기식</div>
-                    <h2 style={{ fontSize: 32, fontWeight: 800, marginBottom: 6, background: "linear-gradient(135deg, #a7f3d0, #93c5fd)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                      {f.productName || "Product"}
-                    </h2>
-                    <p style={{ fontSize: 15, color: "#cbd5e1", marginBottom: 16 }}>{f.productNameKr}</p>
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                      {f.formType && <span style={{ background: "rgba(99,102,241,0.2)", color: "#a5b4fc", padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, border: "1px solid rgba(99,102,241,0.3)" }}>{f.formType}</span>}
-                      {f.pricingStrategy && <span style={{ background: "rgba(16,185,129,0.15)", color: "#6ee7b7", padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>${f.pricingStrategy.suggestedPrice} | 월순이익 ${f.pricingStrategy.monthlyProfit?.toLocaleString?.() || f.pricingStrategy.monthlyProfit}</span>}
-                    </div>
-                    {f.tagline && (
-                      <div style={{ marginTop: 18, borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 14 }}>
-                        <div style={{ fontSize: 16, color: "#e2e8f0", fontWeight: 500, fontStyle: "italic", lineHeight: 1.5 }}>"{f.tagline}"</div>
-                      </div>
-                    )}
-                    {/* Why this category */}
-                    {f.whyThisCategory && (
-                      <div style={{ marginTop: 14, background: "rgba(99,102,241,0.1)", borderRadius: 10, padding: "12px 16px", borderLeft: "3px solid #6366f1" }}>
-                        <div style={{ fontSize: 10, color: "#a5b4fc", fontWeight: 600, marginBottom: 4 }}>왜 이 카테고리인가?</div>
-                        <div style={{ fontSize: 13, color: "#e2e8f0", lineHeight: 1.5 }}>{f.whyThisCategory}</div>
-                      </div>
-                    )}
+                  {/* ═══ 3 Product Cards (Tab Selector) ═══ */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 20 }}>
+                    {recs.map((rec, i) => {
+                      const sColor = strategyColors[rec.strategy] || "#6366f1";
+                      const isSelected = i === fSelectedProduct;
+                      return (
+                        <button key={i} onClick={() => setFSelectedProduct(i)} style={{
+                          background: isSelected ? "#fff" : "#f8fafc", border: isSelected ? `2px solid ${sColor}` : "1px solid #e2e8f0",
+                          borderRadius: 14, padding: 16, cursor: "pointer", textAlign: "left", transition: "all 0.2s",
+                          boxShadow: isSelected ? `0 4px 16px ${sColor}33` : "none", position: "relative", overflow: "hidden"
+                        }}>
+                          {isSelected && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: sColor }} />}
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                            <span style={{ fontSize: 18 }}>{strategyIcons[rec.strategy] || "\u{1F4E6}"}</span>
+                            <span style={{ background: sColor, color: "#fff", padding: "2px 10px", borderRadius: 12, fontSize: 10, fontWeight: 700 }}>
+                              {strategyLabels[rec.strategy] || rec.strategy}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 800, color: "#0f172a", marginBottom: 4, lineHeight: 1.3 }}>{rec.productName}</div>
+                          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>{rec.productNameKr}</div>
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 18, fontWeight: 800, color: sColor }}>${rec.pricingStrategy?.suggestedPrice}</span>
+                            {rec.pricingStrategy && <span style={{ fontSize: 11, color: "#059669", fontWeight: 600, alignSelf: "center" }}>마진 {rec.pricingStrategy.marginPercent}%</span>}
+                          </div>
+                          {rec.roiProjection && (
+                            <div style={{ fontSize: 10, color: "#64748b", marginTop: 6 }}>월순이익 ${(rec.roiProjection.monthlyProfit || 0).toLocaleString()}</div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  {/* ═══ 3 PANELS ═══ */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
-
-                    {/* Panel 1: Competitor Weaknesses */}
-                    <div style={{ background: "#fff", border: "1px solid #fecaca", borderRadius: 14, padding: 20, borderTop: "4px solid #ef4444" }}>
-                      <h4 style={{ fontSize: 13, fontWeight: 700, color: "#dc2626", marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>{"\u{1F6A8}"} 경쟁사 약점 분석</h4>
-
-                      {/* Complaint Percentages */}
-                      {f.complaintsBreakdown?.length > 0 && (
-                        <div style={{ marginBottom: 14 }}>
-                          {f.complaintsBreakdown.map((c, i) => (
-                            <div key={i} style={{ marginBottom: 8 }}>
-                              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 3 }}>
-                                <span style={{ color: "#334155", fontWeight: 600 }}>{c.complaint}</span>
-                                <span style={{ color: "#dc2626", fontWeight: 700 }}>{c.percentage}%</span>
+                  {/* ═══ Selected Product Detail ═══ */}
+                  {sel.productName && (
+                    <div>
+                      {/* Product Hero */}
+                      <div style={{ background: `linear-gradient(135deg, ${strategyColors[sel.strategy] || '#6366f1'}15, ${strategyColors[sel.strategy] || '#6366f1'}05)`, border: `1px solid ${strategyColors[sel.strategy] || '#6366f1'}33`, borderRadius: 16, padding: "24px 28px", marginBottom: 16 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 16 }}>
+                          <div style={{ flex: 1, minWidth: 300 }}>
+                            <div style={{ fontSize: 11, color: strategyColors[sel.strategy], fontWeight: 700, letterSpacing: 1, marginBottom: 6 }}>
+                              {strategyIcons[sel.strategy]} {strategyLabels[sel.strategy]} STRATEGY
+                            </div>
+                            <h2 style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", marginBottom: 4 }}>{sel.productName}</h2>
+                            <p style={{ fontSize: 14, color: "#64748b", marginBottom: 12 }}>{sel.productNameKr}</p>
+                            {sel.formType && <span style={{ background: strategyColors[sel.strategy] + "20", color: strategyColors[sel.strategy], padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600 }}>{sel.formType}</span>}
+                            {sel.tagline && (
+                              <div style={{ marginTop: 14, fontSize: 14, color: "#475569", fontStyle: "italic" }}>"{sel.tagline}"</div>
+                            )}
+                            {sel.whyThisProduct && (
+                              <div style={{ marginTop: 12, fontSize: 12, color: "#334155", lineHeight: 1.6, background: "#f8fafc", padding: "10px 14px", borderRadius: 8, borderLeft: `3px solid ${strategyColors[sel.strategy]}` }}>
+                                {sel.whyThisProduct}
                               </div>
-                              <div style={{ height: 6, background: "#fee2e2", borderRadius: 3 }}>
-                                <div style={{ width: `${Math.min(100, c.percentage)}%`, height: "100%", background: "#ef4444", borderRadius: 3, transition: "width 0.5s" }} />
+                            )}
+                          </div>
+                          {/* FDA + Risk Badge */}
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <div style={{ background: sel.fdaTrafficLight === "GREEN" ? "#ecfdf5" : sel.fdaTrafficLight === "YELLOW" ? "#fffbeb" : "#fef2f2", borderRadius: 10, padding: "10px 14px", textAlign: "center" }}>
+                              <div style={{ width: 16, height: 16, borderRadius: "50%", background: sel.fdaTrafficLight === "GREEN" ? "#10b981" : sel.fdaTrafficLight === "YELLOW" ? "#f59e0b" : "#ef4444", margin: "0 auto 4px" }} />
+                              <div style={{ fontSize: 9, fontWeight: 700 }}>FDA {sel.fdaTrafficLight}</div>
+                            </div>
+                            <div style={{ background: sel.riskLevel === "LOW" ? "#ecfdf5" : sel.riskLevel === "MEDIUM" ? "#fffbeb" : "#fef2f2", borderRadius: 10, padding: "10px 14px", textAlign: "center" }}>
+                              <div style={{ fontSize: 14 }}>{sel.riskLevel === "LOW" ? "\u2705" : sel.riskLevel === "MEDIUM" ? "\u26A0\uFE0F" : "\u{1F6A8}"}</div>
+                              <div style={{ fontSize: 9, fontWeight: 700 }}>Risk {sel.riskLevel}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 3 Column Detail Grid */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 16 }}>
+                        {/* Col 1: Ingredients & Selling Points */}
+                        <div style={{ background: "#fff", border: "1px solid #bbf7d0", borderRadius: 14, padding: 18, borderTop: "4px solid #10b981" }}>
+                          <h4 style={{ fontSize: 13, fontWeight: 700, color: "#059669", marginBottom: 12 }}>{"\u{1F9EA}"} 배합 가이드</h4>
+                          {sel.ingredients?.map((ing, i) => (
+                            <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, fontSize: 11, alignItems: "flex-start" }}>
+                              <div style={{ width: 20, height: 20, background: "linear-gradient(135deg, #10b981, #3b82f6)", borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 9, fontWeight: 700, flexShrink: 0 }}>{i+1}</div>
+                              <div>
+                                <span style={{ fontWeight: 700, color: "#0f172a" }}>{ing.name}</span>
+                                {ing.dosage && <span style={{ color: "#6366f1", fontWeight: 600 }}> {ing.dosage}</span>}
+                                <div style={{ fontSize: 10, color: "#94a3b8" }}>{ing.reason}</div>
                               </div>
                             </div>
                           ))}
-                        </div>
-                      )}
-
-                      {/* Solutions */}
-                      {f.competitorWeaknesses?.slice(0, 3).map((cw, i) => (
-                        <div key={i} style={{ fontSize: 11, color: "#064e3b", background: "#f0fdf4", borderRadius: 8, padding: "8px 10px", marginBottom: 6, borderLeft: `3px solid ${cw.impact === "HIGH" ? "#10b981" : "#94a3b8"}` }}>
-                          <span style={{ fontWeight: 700 }}>{"\u2705"} {cw.ourFix || cw.ourSolution}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Panel 2: Market Viability & Risk */}
-                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, borderTop: "4px solid #6366f1" }}>
-                      <h4 style={{ fontSize: 13, fontWeight: 700, color: "#4338ca", marginBottom: 14 }}>{"\u{1F4CA}"} 시장성 &amp; 리스크</h4>
-
-                      {/* Viral Momentum Score */}
-                      <div style={{ textAlign: "center", marginBottom: 16 }}>
-                        <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600, letterSpacing: 1, marginBottom: 6 }}>VIRAL MOMENTUM</div>
-                        <div style={{ position: "relative", width: 80, height: 80, margin: "0 auto" }}>
-                          <svg viewBox="0 0 36 36" style={{ width: 80, height: 80, transform: "rotate(-90deg)" }}>
-                            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#f1f5f9" strokeWidth="3" />
-                            <circle cx="18" cy="18" r="15.9" fill="none" stroke={vmColor} strokeWidth="3" strokeDasharray={`${vmScore} ${100 - vmScore}`} strokeLinecap="round" />
-                          </svg>
-                          <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", fontSize: 20, fontWeight: 800, color: vmColor }}>{vmScore}</div>
-                        </div>
-                        <div style={{ fontSize: 10, color: "#94a3b8", marginTop: 4 }}>Reddit + Trends</div>
-                      </div>
-
-                      {/* FDA Traffic Light */}
-                      <div style={{ background: tlBg, borderRadius: 10, padding: 12, textAlign: "center", marginBottom: 12 }}>
-                        <div style={{ fontSize: 10, color: "#64748b", fontWeight: 600, marginBottom: 4 }}>FDA SAFETY</div>
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          <div style={{ width: 14, height: 14, borderRadius: "50%", background: tlColor }} />
-                          <span style={{ fontSize: 14, fontWeight: 800, color: tlColor }}>{f.fdaTrafficLight || "N/A"}</span>
-                        </div>
-                        {f.fdaOneLiner && <div style={{ fontSize: 10, color: "#64748b", marginTop: 6, lineHeight: 1.4 }}>{f.fdaOneLiner}</div>}
-                      </div>
-
-                      {/* Pricing mini */}
-                      {f.pricingStrategy && (
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                          <div style={{ background: "#f8fafc", borderRadius: 8, padding: 8, textAlign: "center" }}>
-                            <div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a" }}>${f.pricingStrategy.suggestedPrice}</div>
-                            <div style={{ fontSize: 9, color: "#94a3b8" }}>Sell Price</div>
-                          </div>
-                          <div style={{ background: "#fef2f2", borderRadius: 8, padding: 8, textAlign: "center" }}>
-                            <div style={{ fontSize: 16, fontWeight: 800, color: "#dc2626" }}>${f.pricingStrategy.targetCOGS}</div>
-                            <div style={{ fontSize: 9, color: "#dc2626" }}>Max COGS</div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Panel 3: Formulation Guide & Selling Points */}
-                    <div style={{ background: "#fff", border: "1px solid #bbf7d0", borderRadius: 14, padding: 20, borderTop: "4px solid #10b981" }}>
-                      <h4 style={{ fontSize: 13, fontWeight: 700, color: "#059669", marginBottom: 14 }}>{"\u{1F9EA}"} 배합 가이드 &amp; 셀링포인트</h4>
-
-                      {/* Ingredients compact */}
-                      {f.ingredients?.map((ing, i) => (
-                        <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, fontSize: 11 }}>
-                          <div style={{ width: 22, height: 22, background: "linear-gradient(135deg, #10b981, #3b82f6)", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 10, fontWeight: 700, flexShrink: 0 }}>{i + 1}</div>
-                          <div>
-                            <span style={{ fontWeight: 700, color: "#0f172a" }}>{ing.name}</span>
-                            {ing.dosage && <span style={{ color: "#6366f1", fontWeight: 600 }}> {ing.dosage}</span>}
-                            <div style={{ fontSize: 10, color: "#94a3b8" }}>{ing.reason}</div>
-                          </div>
-                        </div>
-                      ))}
-
-                      {f.synergyOneLiner && (
-                        <div style={{ background: "#f0fdf4", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 10, fontSize: 10, color: "#064e3b", fontWeight: 600, borderLeft: "3px solid #10b981" }}>
-                          {"\u2728"} {f.synergyOneLiner}
-                        </div>
-                      )}
-
-                      {/* Selling Points */}
-                      {f.sellingPoints?.map((sp, i) => (
-                        <div key={i} style={{ fontSize: 11, color: "#334155", marginBottom: 4, paddingLeft: 10, borderLeft: "3px solid #6366f1" }}>{sp}</div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* ═══ Amazon Title & Domination Reason (compact) ═══ */}
-                  {f.amazonTitle && (
-                    <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 12, padding: "14px 18px", marginBottom: 12 }}>
-                      <div style={{ fontSize: 10, fontWeight: 600, color: "#92400e", marginBottom: 4 }}>AMAZON PRODUCT TITLE</div>
-                      <div style={{ fontSize: 12, color: "#78350f", fontWeight: 600, lineHeight: 1.4 }}>{f.amazonTitle}</div>
-                    </div>
-                  )}
-                  {f.dominationReason && (
-                    <div style={{ background: "linear-gradient(135deg, #059669, #10b981)", borderRadius: 12, padding: "14px 18px", marginBottom: 16, color: "#fff" }}>
-                      <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1 }}>{"\u{1F451}"} WHY THIS DOMINATES</span>
-                      <div style={{ fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>{f.dominationReason}</div>
-                    </div>
-                  )}
-
-                  {/* ═══ Data Sources Accordion ═══ */}
-                  <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 16, marginTop: 8 }}>
-                    <button onClick={() => setShowRawData(!showRawData)} style={{
-                      width: "100%", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10,
-                      padding: "12px 18px", fontSize: 13, cursor: "pointer", color: "#64748b", fontWeight: 600,
-                      display: "flex", justifyContent: "space-between", alignItems: "center"
-                    }}>
-                      <span>📋 이 결론의 데이터 근거 보기</span>
-                      <span style={{ fontSize: 18, transition: "transform 0.2s", transform: showRawData ? "rotate(180deg)" : "rotate(0)" }}>▼</span>
-                    </button>
-                    {showRawData && (
-                      <div style={{ marginTop: 12, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 16 }}>
-                        <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-                          {formulatorResult.dataSourcesSummary && <>
-                            <span style={{ background: "#eef2ff", color: "#4338ca", padding: "4px 10px", borderRadius: 20, fontSize: 10, fontWeight: 600 }}>SP-API: {formulatorResult.dataSourcesSummary.spApiCategories} categories</span>
-                            <span style={{ background: "#fef2f2", color: "#dc2626", padding: "4px 10px", borderRadius: 20, fontSize: 10, fontWeight: 600 }}>Reddit: {formulatorResult.dataSourcesSummary.redditPosts} posts</span>
-                            <span style={{ background: "#ecfdf5", color: "#059669", padding: "4px 10px", borderRadius: 20, fontSize: 10, fontWeight: 600 }}>FDA: {formulatorResult.dataSourcesSummary.fdaIngredients} ingredients</span>
-                            <span style={{ background: "#f8fafc", color: "#94a3b8", padding: "4px 10px", borderRadius: 20, fontSize: 10 }}>Gemini 2.0 Flash</span>
-                          </>}
-                        </div>
-                        {/* Top 5 Market Opportunities */}
-                        {mo?.top5 && (
-                          <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>📊 Top 5 시장 기회 (Domination Score 순)</div>
-                            {mo.top5.map((cat, i) => (
-                              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: i === 0 ? "#ecfdf5" : "#f8fafc", borderRadius: 8, marginBottom: 4, border: i === 0 ? "1px solid #a7f3d0" : "1px solid #e2e8f0" }}>
-                                <span style={{ fontSize: 14, fontWeight: 800, color: i === 0 ? "#059669" : "#64748b", minWidth: 24 }}>#{i + 1}</span>
-                                <span style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", minWidth: 100 }}>{cat.category}</span>
-                                <span style={{ fontSize: 11, color: "#6366f1", fontWeight: 600 }}>Score: {cat.dominationScore}</span>
-                                <span style={{ fontSize: 11, color: "#64748b" }}>Brands: {cat.brandCount}</span>
-                                <span style={{ fontSize: 11, color: "#64748b" }}>Rev: ${(cat.monthlyRevenue || 0).toLocaleString()}/mo</span>
-                              </div>
+                          <div style={{ borderTop: "1px solid #e2e8f0", marginTop: 10, paddingTop: 10 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: "#0f172a", marginBottom: 6 }}>{"\u2B50"} 셀링포인트</div>
+                            {sel.sellingPoints?.map((sp, i) => (
+                              <div key={i} style={{ fontSize: 11, color: "#334155", marginBottom: 4, paddingLeft: 8, borderLeft: "3px solid #6366f1" }}>{sp}</div>
                             ))}
                           </div>
-                        )}
-                        <pre style={{ background: "#0f172a", color: "#a7f3d0", borderRadius: 8, padding: 14, fontSize: 10, maxHeight: 400, overflow: "auto", whiteSpace: "pre-wrap" }}>
-                          {JSON.stringify(formulatorResult, null, 2)}
-                        </pre>
+                        </div>
+
+                        {/* Col 2: Competitor Weaknesses */}
+                        <div style={{ background: "#fff", border: "1px solid #fecaca", borderRadius: 14, padding: 18, borderTop: "4px solid #ef4444" }}>
+                          <h4 style={{ fontSize: 13, fontWeight: 700, color: "#dc2626", marginBottom: 12 }}>{"\u{1F6A8}"} 경쟁사 약점 & 우리 전략</h4>
+                          {sel.competitorWeaknesses?.map((cw, i) => (
+                            <div key={i} style={{ marginBottom: 10 }}>
+                              <div style={{ fontSize: 11, color: "#991b1b", fontWeight: 600, marginBottom: 3 }}>{"\u274C"} {cw.weakness}</div>
+                              <div style={{ fontSize: 11, color: "#064e3b", background: "#f0fdf4", borderRadius: 6, padding: "6px 10px", borderLeft: `3px solid ${cw.impact === "HIGH" ? "#10b981" : "#94a3b8"}` }}>
+                                {"\u2705"} {cw.ourFix}
+                                <span style={{ float: "right", fontSize: 9, fontWeight: 700, color: cw.impact === "HIGH" ? "#10b981" : "#f59e0b" }}>{cw.impact}</span>
+                              </div>
+                            </div>
+                          ))}
+                          {sel.riskNote && (
+                            <div style={{ background: "#fffbeb", borderRadius: 8, padding: "8px 10px", fontSize: 10, color: "#92400e", marginTop: 8, borderLeft: "3px solid #f59e0b" }}>
+                              {"\u26A0\uFE0F"} {sel.riskNote}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Col 3: Pricing & Quick ROI */}
+                        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 18, borderTop: `4px solid ${strategyColors[sel.strategy] || '#6366f1'}` }}>
+                          <h4 style={{ fontSize: 13, fontWeight: 700, color: "#4338ca", marginBottom: 12 }}>{"\u{1F4B0}"} 가격 전략</h4>
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+                            <div style={{ background: "#f0fdf4", borderRadius: 8, padding: 10, textAlign: "center" }}>
+                              <div style={{ fontSize: 22, fontWeight: 800, color: "#059669" }}>${sel.pricingStrategy?.suggestedPrice}</div>
+                              <div style={{ fontSize: 9, color: "#64748b" }}>판매가</div>
+                            </div>
+                            <div style={{ background: "#fef2f2", borderRadius: 8, padding: 10, textAlign: "center" }}>
+                              <div style={{ fontSize: 22, fontWeight: 800, color: "#dc2626" }}>${sel.pricingStrategy?.targetCOGS}</div>
+                              <div style={{ fontSize: 9, color: "#64748b" }}>원가(COGS)</div>
+                            </div>
+                          </div>
+                          <div style={{ background: "#f8fafc", borderRadius: 8, padding: 10, textAlign: "center", marginBottom: 8 }}>
+                            <div style={{ fontSize: 28, fontWeight: 800, color: strategyColors[sel.strategy] }}>{sel.pricingStrategy?.marginPercent}%</div>
+                            <div style={{ fontSize: 10, color: "#64748b" }}>마진율</div>
+                          </div>
+                          {sel.pricingStrategy?.reasoning && (
+                            <div style={{ fontSize: 10, color: "#64748b", lineHeight: 1.5 }}>{sel.pricingStrategy.reasoning}</div>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
+
+                      {/* ═══ MARKET PIE & ROI CALCULATOR ═══ */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+
+                        {/* Market Pie */}
+                        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20 }}>
+                          <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 14 }}>{"\u{1F967}"} 연간 시장 파이</h4>
+                          {sel.marketSizing && (
+                            <div>
+                              <div style={{ position: "relative", width: 160, height: 160, margin: "0 auto 16px" }}>
+                                <svg viewBox="0 0 36 36" style={{ width: 160, height: 160, transform: "rotate(-90deg)" }}>
+                                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e2e8f0" strokeWidth="4" />
+                                  <circle cx="18" cy="18" r="15.9" fill="none" stroke={strategyColors[sel.strategy] || "#6366f1"} strokeWidth="4"
+                                    strokeDasharray={`${Math.max(0.5, fCustomSharePct)} ${100 - Math.max(0.5, fCustomSharePct)}`} strokeLinecap="round" />
+                                </svg>
+                                <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", textAlign: "center" }}>
+                                  <div style={{ fontSize: 24, fontWeight: 800, color: strategyColors[sel.strategy] }}>{fCustomSharePct}%</div>
+                                  <div style={{ fontSize: 9, color: "#94a3b8" }}>목표 점유율</div>
+                                </div>
+                              </div>
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+                                <div style={{ background: "#f8fafc", borderRadius: 8, padding: 10, textAlign: "center" }}>
+                                  <div style={{ fontSize: 14, fontWeight: 800, color: "#0f172a" }}>${(sel.marketSizing.annualMarketSize || 0).toLocaleString()}</div>
+                                  <div style={{ fontSize: 9, color: "#94a3b8" }}>연간 전체 시장</div>
+                                </div>
+                                <div style={{ background: "#f0fdf4", borderRadius: 8, padding: 10, textAlign: "center" }}>
+                                  <div style={{ fontSize: 14, fontWeight: 800, color: "#059669" }}>${Math.round((sel.marketSizing.annualMarketSize || 0) * fCustomSharePct / 100).toLocaleString()}</div>
+                                  <div style={{ fontSize: 9, color: "#94a3b8" }}>우리 예상 매출</div>
+                                </div>
+                              </div>
+                              {/* Share slider */}
+                              <div style={{ marginBottom: 8 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+                                  <span style={{ color: "#64748b" }}>목표 점유율 조절</span>
+                                  <span style={{ fontWeight: 700, color: strategyColors[sel.strategy] }}>{fCustomSharePct}%</span>
+                                </div>
+                                <input type="range" min="0.1" max="10" step="0.1" value={fCustomSharePct}
+                                  onChange={e => setFCustomSharePct(parseFloat(e.target.value))}
+                                  style={{ width: "100%", accentColor: strategyColors[sel.strategy] }} />
+                                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#94a3b8" }}>
+                                  <span>0.1%</span><span>10%</span>
+                                </div>
+                              </div>
+                              <div style={{ fontSize: 10, color: "#64748b", marginTop: 4 }}>
+                                {"\u{1F4CA}"} 월 예상 판매량: {sel.marketSizing.projectedMonthlyUnits?.toLocaleString() || 'N/A'}개
+                              </div>
+                              {mkt.growthTrend && (
+                                <div style={{ fontSize: 10, color: "#059669", marginTop: 4 }}>{"\u{1F4C8}"} {mkt.growthTrend}</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* ROI Calculator */}
+                        <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20 }}>
+                          <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 14 }}>{"\u{1F4B5}"} ROI 시뮬레이터</h4>
+
+                          {/* Custom budget input */}
+                          <div style={{ marginBottom: 14 }}>
+                            <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>투자금액 입력</div>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              {[5000, 10000, 20000, 50000].map(amt => (
+                                <button key={amt} onClick={() => setFCustomBudget(amt)} style={{
+                                  flex: 1, padding: "6px 4px", borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: "pointer",
+                                  background: fCustomBudget === amt ? "#0f172a" : "#f8fafc",
+                                  color: fCustomBudget === amt ? "#fff" : "#64748b",
+                                  border: fCustomBudget === amt ? "none" : "1px solid #e2e8f0"
+                                }}>${(amt/1000)}K</button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {sel.roiProjection && (
+                            <div>
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+                                <div style={{ background: "#ecfdf5", borderRadius: 8, padding: 10, textAlign: "center" }}>
+                                  <div style={{ fontSize: 18, fontWeight: 800, color: "#059669" }}>${(sel.roiProjection.monthlyRevenue || customMonthlyRev).toLocaleString()}</div>
+                                  <div style={{ fontSize: 9, color: "#64748b" }}>월 매출</div>
+                                </div>
+                                <div style={{ background: "#f0fdf4", borderRadius: 8, padding: 10, textAlign: "center" }}>
+                                  <div style={{ fontSize: 18, fontWeight: 800, color: "#10b981" }}>${(sel.roiProjection.monthlyProfit || customMonthlyProfit).toLocaleString()}</div>
+                                  <div style={{ fontSize: 9, color: "#64748b" }}>월 순이익</div>
+                                </div>
+                              </div>
+
+                              {/* Break-even & ROI */}
+                              <div style={{ background: "linear-gradient(135deg, #0f172a, #1e293b)", borderRadius: 12, padding: 16, color: "#fff", marginBottom: 12 }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                                  <div style={{ textAlign: "center" }}>
+                                    <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 4 }}>손익분기</div>
+                                    <div style={{ fontSize: 28, fontWeight: 800, color: userBreakEven <= 3 ? "#10b981" : userBreakEven <= 6 ? "#f59e0b" : "#ef4444" }}>{userBreakEven}</div>
+                                    <div style={{ fontSize: 10, color: "#94a3b8" }}>개월</div>
+                                  </div>
+                                  <div style={{ textAlign: "center" }}>
+                                    <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 4 }}>1년 ROI</div>
+                                    <div style={{ fontSize: 28, fontWeight: 800, color: userYearROI > 100 ? "#10b981" : userYearROI > 0 ? "#f59e0b" : "#ef4444" }}>{userYearROI}%</div>
+                                    <div style={{ fontSize: 10, color: "#94a3b8" }}>수익률</div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Yearly projection */}
+                              <div style={{ fontSize: 11, color: "#334155" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f1f5f9" }}>
+                                  <span>투자금</span>
+                                  <span style={{ fontWeight: 700 }}>${fCustomBudget.toLocaleString()}</span>
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f1f5f9" }}>
+                                  <span>연간 매출 예상</span>
+                                  <span style={{ fontWeight: 700, color: "#059669" }}>${((sel.roiProjection.monthlyRevenue || customMonthlyRev) * 12).toLocaleString()}</span>
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f1f5f9" }}>
+                                  <span>연간 순이익 예상</span>
+                                  <span style={{ fontWeight: 700, color: "#10b981" }}>${((sel.roiProjection.monthlyProfit || customMonthlyProfit) * 12).toLocaleString()}</span>
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
+                                  <span>순이익 (투자금 차감)</span>
+                                  <span style={{ fontWeight: 700, color: ((sel.roiProjection.monthlyProfit || customMonthlyProfit) * 12 - fCustomBudget) > 0 ? "#10b981" : "#ef4444" }}>
+                                    ${((sel.roiProjection.monthlyProfit || customMonthlyProfit) * 12 - fCustomBudget).toLocaleString()}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* ═══ Data Sources Accordion ═══ */}
+                      <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 16, marginTop: 8 }}>
+                        <button onClick={() => setShowRawData(!showRawData)} style={{
+                          width: "100%", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10,
+                          padding: "12px 18px", fontSize: 13, cursor: "pointer", color: "#64748b", fontWeight: 600,
+                          display: "flex", justifyContent: "space-between", alignItems: "center"
+                        }}>
+                          <span>{"\u{1F4CB}"} 데이터 근거 보기</span>
+                          <span style={{ fontSize: 18, transition: "transform 0.2s", transform: showRawData ? "rotate(180deg)" : "rotate(0)" }}>{"\u25BC"}</span>
+                        </button>
+                        {showRawData && (
+                          <div style={{ marginTop: 12, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: 16 }}>
+                            <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                              {formulatorResult.dataSourcesSummary && <>
+                                <span style={{ background: "#eef2ff", color: "#4338ca", padding: "4px 10px", borderRadius: 20, fontSize: 10, fontWeight: 600 }}>SP-API: {formulatorResult.dataSourcesSummary.spApiCategories} categories</span>
+                                <span style={{ background: "#fef2f2", color: "#dc2626", padding: "4px 10px", borderRadius: 20, fontSize: 10, fontWeight: 600 }}>Reddit: {formulatorResult.dataSourcesSummary.redditPosts} posts</span>
+                                <span style={{ background: "#ecfdf5", color: "#059669", padding: "4px 10px", borderRadius: 20, fontSize: 10, fontWeight: 600 }}>FDA: {formulatorResult.dataSourcesSummary.fdaIngredients} ingredients</span>
+                              </>}
+                            </div>
+                            {md.categories && (
+                              <div style={{ marginBottom: 12 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>{"\u{1F4CA}"} 분석된 카테고리 (Domination Score 순)</div>
+                                {md.categories.slice(0, 8).map((cat, i) => (
+                                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 12px", background: i === 0 ? "#ecfdf5" : "#f8fafc", borderRadius: 8, marginBottom: 3, border: i === 0 ? "1px solid #a7f3d0" : "1px solid #e2e8f0", fontSize: 11 }}>
+                                    <span style={{ fontWeight: 800, color: i === 0 ? "#059669" : "#64748b", minWidth: 22 }}>#{i+1}</span>
+                                    <span style={{ fontWeight: 700, color: "#0f172a", minWidth: 90 }}>{cat.category}</span>
+                                    <span style={{ color: "#6366f1", fontWeight: 600 }}>Score:{cat.dominationScore}</span>
+                                    <span style={{ color: "#64748b" }}>Brands:{cat.brandCount}</span>
+                                    <span style={{ color: "#64748b" }}>Rev:${(cat.monthlyRevenue||0).toLocaleString()}/mo</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <pre style={{ background: "#0f172a", color: "#a7f3d0", borderRadius: 8, padding: 14, fontSize: 10, maxHeight: 400, overflow: "auto", whiteSpace: "pre-wrap" }}>
+                              {JSON.stringify(formulatorResult, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })()}

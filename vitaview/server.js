@@ -1834,7 +1834,7 @@ const HEALTH_CONCERNS = {
   muscle: { label: 'Muscle & Performance', categories: ['creatine', 'bcaa', 'glutamine', 'whey_protein', 'beta_alanine', 'citrulline', 'electrolytes', 'protein'], subreddits: ['supplements', 'Fitness', 'bodybuilding'] }
 };
 
-// ===== AUTO-RECOMMEND: AI picks the best opportunity from ALL data =====
+// ===== SMART RECOMMEND: User picks target, AI recommends 3 products with market sizing & ROI =====
 app.get('/api/ai-formulator/auto-recommend', async (req, res) => {
   if (!trendsCache?.categories) {
     return res.status(503).json({ error: 'Data not loaded yet. Please wait for initial data fetch.' });
@@ -1843,8 +1843,14 @@ app.get('/api/ai-formulator/auto-recommend', async (req, res) => {
     return res.json({ error: 'GEMINI_API_KEY not set', message: 'Gemini API 키가 필요합니다. .env 파일에 GEMINI_API_KEY=your_key를 추가해주세요.' });
   }
 
+  // User inputs
+  const targetMarket = req.query.targetMarket || '';  // e.g. "sleep", "gut", "beauty"
+  const preferredIngredients = req.query.ingredients || '';  // e.g. "ashwagandha,magnesium"
+  const formType = req.query.formType || '';  // e.g. "gummy", "capsule", "powder"
+  const budget = parseInt(req.query.budget) || 10000;  // initial investment USD
+
   try {
-    // 1. Calculate Domination Scores server-side (same logic as frontend)
+    // 1. Calculate Domination Scores for ALL categories
     const catEntries = Object.entries(trendsCache.categories);
     const maxRev = Math.max(...catEntries.map(([,c]) => c.estimatedMonthlyRevenue || 0), 1);
     const maxSpread = Math.max(...catEntries.map(([,c]) => c.priceSpread || 0), 1);
@@ -1889,14 +1895,23 @@ app.get('/api/ai-formulator/auto-recommend', async (req, res) => {
         topBrand: topBrandEntry ? topBrandEntry[0] : 'N/A',
         topProducts: (c.topProducts || []).slice(0, 5),
         minPrice: c.minPrice || 0, maxPrice: c.maxPrice || 0,
-        brands: c.brands
+        brands: c.brands,
+        annualRevenue: revenue * 12
       };
     }).sort((a, b) => b.dominationScore - a.dominationScore);
 
-    // 2. Pick top 5 opportunities
-    const top5 = scored.slice(0, 5);
+    // 2. Filter by user's target market if specified
+    let relevantCategories = scored;
+    if (targetMarket && HEALTH_CONCERNS[targetMarket]) {
+      const targetCats = HEALTH_CONCERNS[targetMarket].categories;
+      relevantCategories = scored.filter(s => targetCats.includes(s.catId));
+      if (relevantCategories.length === 0) relevantCategories = scored.slice(0, 10);
+    }
 
-    // 3. Map each top category to its health concern
+    // 3. Build market context (top 8 relevant categories)
+    const topCats = relevantCategories.slice(0, 8);
+
+    // 4. Map categories to health concerns
     const categoryConcernMap = {};
     for (const [concernKey, concernData] of Object.entries(HEALTH_CONCERNS)) {
       for (const cat of concernData.categories) {
@@ -1905,12 +1920,12 @@ app.get('/api/ai-formulator/auto-recommend', async (req, res) => {
       }
     }
 
-    // 4. Get Reddit data for the top category
+    // 5. Get Reddit data
     let redditData = { topPosts: [] };
     try {
-      const topCatName = top5[0].catId.replace(/_/g, ' ');
+      const searchTerm = targetMarket ? (HEALTH_CONCERNS[targetMarket]?.label || targetMarket) : topCats[0]?.catId?.replace(/_/g, ' ') || 'supplement';
       const result = await httpsGet('www.reddit.com',
-        `/search.json?q=${encodeURIComponent(topCatName + ' supplement')}&sort=relevance&t=month&limit=20`,
+        `/search.json?q=${encodeURIComponent(searchTerm + ' supplement')}&sort=relevance&t=month&limit=20`,
         { 'User-Agent': 'VitaView/1.0 (supplement research)' }
       );
       const posts = (result.data?.data?.children || [])
@@ -1921,10 +1936,10 @@ app.get('/api/ai-formulator/auto-recommend', async (req, res) => {
       redditData.topPosts = posts.map(p => `[Score:${p.score}] ${p.title}`);
     } catch(e) { redditData.error = e.message; }
 
-    // 5. Get FDA data for top ingredients
+    // 6. Get FDA data
     let fdaData = [];
     try {
-      for (const cat of top5.slice(0, 3)) {
+      for (const cat of topCats.slice(0, 3)) {
         const ingName = cat.catId.replace(/_/g, ' ');
         try {
           const aeRes = await httpsGet('api.fda.gov', `/food/event.json?search=products.name_brand:"${encodeURIComponent(ingName)}"&limit=1`, {});
@@ -1934,14 +1949,15 @@ app.get('/api/ai-formulator/auto-recommend', async (req, res) => {
       }
     } catch(e) {}
 
-    // 6. Build the ALL-IN-ONE context for Gemini
-    const top5Context = top5.map(cat => ({
+    // 7. Build context for Gemini
+    const marketContext = topCats.map(cat => ({
       category: cat.catId,
       dominationScore: cat.dominationScore,
       brandCount: cat.brandCount,
       totalProducts: cat.totalProducts,
       avgDailySales: cat.avgDailySales,
       monthlyRevenue: cat.revenue,
+      annualRevenue: cat.annualRevenue,
       avgPrice: cat.avgPrice,
       priceRange: `$${cat.minPrice} ~ $${cat.maxPrice}`,
       hhi: cat.hhi,
@@ -1951,71 +1967,105 @@ app.get('/api/ai-formulator/auto-recommend', async (req, res) => {
       topProducts: cat.topProducts.slice(0, 3).map(p => `${p.brand} - ${p.title} ($${p.price}, Rank #${p.rank})`)
     }));
 
-    // 7. GEMINI PROMPT - Definitive Recommendation
-    const systemPrompt = `You are the world's #1 Amazon FBA supplement consultant and a certified pharmacist. You analyze real market data and make ONE definitive product recommendation. You don't ask questions - you give THE answer.
+    // Calculate total market size for relevant categories
+    const totalAnnualMarket = topCats.reduce((sum, c) => sum + c.annualRevenue, 0);
+
+    // 8. GEMINI PROMPT - 3 Product Recommendations with Market Sizing & ROI
+    const systemPrompt = `You are the world's #1 Amazon FBA supplement consultant. You analyze real market data and recommend 3 differentiated products based on the user's target market and preferences. Each recommendation targets a different price point and strategy.
 
 IMPORTANT: Always respond in Korean (한국어). Follow the exact JSON schema. Be bold, data-driven, and decisive.`;
 
-    const userPrompt = `아래는 아마존 건기식 시장의 실시간 데이터야. 전체 ${scored.length}개 카테고리를 분석한 결과, 상위 5개 기회를 보여줄게.
+    const userInputSection = `## 사용자 요청:
+- 타겟 시장: ${targetMarket ? (HEALTH_CONCERNS[targetMarket]?.label || targetMarket) : '전체 (사용자 미선택)'}
+- 선호 원료: ${preferredIngredients || '없음 (AI 추천)'}
+- 선호 제형: ${formType || '없음 (AI 추천)'}
+- 초기 투자 예산: $${budget.toLocaleString()}`;
 
-## TOP 5 시장 기회 (Domination Score 순):
-${JSON.stringify(top5Context, null, 2)}
+    const userPrompt = `${userInputSection}
 
-## Reddit 소비자 반응 (${top5[0].catId}):
+## 해당 시장 카테고리 데이터 (${topCats.length}개):
+${JSON.stringify(marketContext, null, 2)}
+
+## 연간 시장 규모 (해당 카테고리 합산): $${totalAnnualMarket.toLocaleString()}
+
+## Reddit 소비자 반응:
 ${JSON.stringify(redditData, null, 2)}
 
 ## FDA 안전성 데이터:
 ${JSON.stringify(fdaData, null, 2)}
 
 ## 전체 시장 요약:
-- 분석 카테고리: ${scored.length}개
-- Easy Entry (70+): ${scored.filter(s => s.dominationScore >= 70).length}개
-- Medium Entry (50-69): ${scored.filter(s => s.dominationScore >= 50 && s.dominationScore < 70).length}개
-- Hard Entry (<50): ${scored.filter(s => s.dominationScore < 50).length}개
+- 전체 분석 카테고리: ${scored.length}개
+- 해당 분야 카테고리: ${topCats.length}개
+- Easy Entry (70+): ${topCats.filter(s => s.dominationScore >= 70).length}개
+- Hard Entry (<50): ${topCats.filter(s => s.dominationScore < 50).length}개
 
-## 미션: 딱 1개의 신제품을 추천해. "이 제품을 만들어라"는 확정 답변을 줘.
+## 미션: 3개의 차별화된 제품을 추천해줘.
+- 제품1: 프리미엄 전략 (고가, 고마진)
+- 제품2: 가성비 전략 (중가, 대량 판매)
+- 제품3: 틈새 전략 (독특한 배합/제형으로 차별화)
+
+각 제품에 대해 시장 파이와 ROI를 반드시 계산해서 포함해줘.
+사용자가 선호 원료나 제형을 입력했으면 그것을 반영하되, AI가 더 나은 옵션이 있다고 판단하면 이유와 함께 대안을 제시해.
 
 반드시 아래 JSON으로 답변:
 {
-  "productName": "영어 브랜드 제품명 (예: VitaRest Sleep Complex)",
-  "productNameKr": "한국어 제품 설명 한 줄",
-  "formType": "제형 (리포조말 소프트젤, 구미, 분말스틱 등)",
-  "tagline": "아마존 상세페이지 첫 줄 영어 카피 (한 문장)",
-  "whyThisCategory": "왜 이 카테고리인지 데이터 근거 2-3문장 (Domination Score, 브랜드 수, 매출 등 수치 포함)",
-  "viralMomentumScore": 0에서100사이숫자,
-  "complaintsBreakdown": [
-    {"complaint": "불만 유형", "percentage": 퍼센트숫자, "source": "데이터 근거"}
+  "recommendations": [
+    {
+      "strategy": "PREMIUM 또는 VALUE 또는 NICHE",
+      "productName": "영어 브랜드 제품명",
+      "productNameKr": "한국어 제품 설명 한 줄",
+      "formType": "제형",
+      "tagline": "아마존 카피 한 줄 (영어)",
+      "targetCategory": "주요 타겟 카테고리 ID",
+      "whyThisProduct": "왜 이 제품인지 2-3문장 (데이터 근거)",
+      "ingredients": [
+        {"name": "성분명", "dosage": "용량", "reason": "이유"}
+      ],
+      "pricingStrategy": {
+        "suggestedPrice": 가격숫자,
+        "targetCOGS": 원가숫자,
+        "marginPercent": 마진율숫자,
+        "reasoning": "가격 전략 한 줄"
+      },
+      "marketSizing": {
+        "annualMarketSize": 연간시장규모숫자,
+        "targetMarketShare": 목표점유율숫자,
+        "projectedAnnualRevenue": 예상연매출숫자,
+        "projectedMonthlyUnits": 예상월판매량숫자
+      },
+      "roiProjection": {
+        "initialInvestment": 초기투자숫자,
+        "monthlyRevenue": 월매출숫자,
+        "monthlyCost": 월비용숫자,
+        "monthlyProfit": 월순이익숫자,
+        "breakEvenMonths": 손익분기월숫자,
+        "yearOneROI": 1년ROI퍼센트숫자
+      },
+      "competitorWeaknesses": [
+        {"weakness": "약점", "ourFix": "우리 해결", "impact": "HIGH/MEDIUM/LOW"}
+      ],
+      "sellingPoints": ["포인트1", "포인트2", "포인트3"],
+      "fdaTrafficLight": "GREEN/YELLOW/RED",
+      "riskLevel": "LOW/MEDIUM/HIGH",
+      "riskNote": "리스크 한 줄"
+    }
   ],
-  "fdaTrafficLight": "GREEN 또는 YELLOW 또는 RED",
-  "fdaOneLiner": "FDA 관련 주의사항 한 줄",
-  "ingredients": [
-    {"name": "성분명", "dosage": "용량", "reason": "배합 이유 한 줄"}
-  ],
-  "synergyOneLiner": "성분 배합 시너지 핵심 한 줄",
-  "competitorWeaknesses": [
-    {"weakness": "기존 약점", "ourFix": "우리 해결법", "impact": "HIGH/MEDIUM/LOW"}
-  ],
-  "pricingStrategy": {
-    "suggestedPrice": 가격숫자,
-    "targetCOGS": 원가숫자,
-    "monthlyProfit": 월순이익숫자,
-    "reasoning": "가격 전략 한 줄"
-  },
-  "sellingPoints": ["셀링포인트1", "셀링포인트2", "셀링포인트3"],
-  "amazonTitle": "아마존 상품 타이틀 영어 200자 이내",
-  "dominationReason": "독점 가능 핵심 이유 2-3문장",
-  "targetCategory": "추천 카테고리 ID (top5 중 하나)"
+  "marketOverall": {
+    "totalAnnualMarket": 전체연간시장규모,
+    "growthTrend": "성장 추세 한 줄",
+    "bestOpportunity": "3개 중 가장 추천하는 것과 이유 2문장"
+  }
 }`;
 
-    // 8. Call Gemini
+    // 9. Call Gemini
     const geminiBody = JSON.stringify({
       contents: [{ parts: [{ text: systemPrompt + '\n\n' + userPrompt }] }],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 4096, responseMimeType: "application/json" }
+      generationConfig: { temperature: 0.7, maxOutputTokens: 8192, responseMimeType: "application/json" }
     });
 
-    console.log('🤖 Auto-recommend: calling Gemini with top 5 opportunities...');
-    console.log('🔑 GEMINI_API_KEY:', GEMINI_API_KEY ? `${GEMINI_API_KEY.slice(0,10)}...` : 'NOT SET');
-    console.log('📝 Prompt length:', (systemPrompt + userPrompt).length, 'chars');
+    console.log('🤖 Smart-recommend: calling Gemini with user preferences...');
+    console.log('📋 Target:', targetMarket, '| Ingredients:', preferredIngredients, '| Form:', formType, '| Budget:', budget);
 
     const geminiRes = await httpsPost(
       'generativelanguage.googleapis.com',
@@ -2025,7 +2075,6 @@ ${JSON.stringify(fdaData, null, 2)}
     );
 
     console.log('📡 Gemini response status:', geminiRes.status);
-    console.log('📡 Gemini response keys:', Object.keys(geminiRes.data || {}));
     if (geminiRes.data?.error) {
       console.log('❌ Gemini error:', JSON.stringify(geminiRes.data.error));
     }
@@ -2040,12 +2089,12 @@ ${JSON.stringify(fdaData, null, 2)}
 
       res.json({
         aiFormulation: aiResponse,
-        marketOverview: {
+        userInputs: { targetMarket, preferredIngredients, formType, budget },
+        marketData: {
           totalCategories: scored.length,
-          easyEntry: scored.filter(s => s.dominationScore >= 70).length,
-          moderateEntry: scored.filter(s => s.dominationScore >= 50 && s.dominationScore < 70).length,
-          hardEntry: scored.filter(s => s.dominationScore < 50).length,
-          top5: top5Context
+          relevantCategories: topCats.length,
+          totalAnnualMarket,
+          categories: marketContext
         },
         dataSourcesSummary: {
           spApiCategories: scored.length,
@@ -2063,8 +2112,8 @@ ${JSON.stringify(fdaData, null, 2)}
       });
     }
   } catch(e) {
-    console.error('Auto-recommend error:', e.message);
-    res.status(500).json({ error: 'Auto-recommend failed: ' + e.message });
+    console.error('Smart-recommend error:', e.message);
+    res.status(500).json({ error: 'Smart-recommend failed: ' + e.message });
   }
 });
 
