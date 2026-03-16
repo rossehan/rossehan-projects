@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OEM 생산일정 스케줄러 - 식품 신제품 개발</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; background: #f0f2f5; color: #333; }
+
+        /* Navigation */
+        .nav { background: linear-gradient(135deg, #1a73e8, #0d47a1); padding: 0; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .nav-inner { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; padding: 0 20px; }
+        .nav-logo { color: #fff; font-size: 18px; font-weight: 700; padding: 16px 0; white-space: nowrap; }
+        .nav-logo span { font-size: 12px; font-weight: 400; opacity: 0.8; display: block; }
+        .nav-tabs { display: flex; margin-left: 40px; gap: 0; }
+        .nav-tab { color: rgba(255,255,255,0.7); padding: 18px 20px; cursor: pointer; font-size: 14px; font-weight: 500; border-bottom: 3px solid transparent; transition: all 0.2s; white-space: nowrap; }
+        .nav-tab:hover { color: #fff; background: rgba(255,255,255,0.1); }
+        .nav-tab.active { color: #fff; border-bottom-color: #fff; }
+
+        /* Main Layout */
+        .container { max-width: 1400px; margin: 0 auto; padding: 24px 20px; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Cards */
+        .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); padding: 24px; margin-bottom: 20px; }
+        .card-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .card-title .icon { font-size: 22px; }
+
+        /* Grid */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+        @media (max-width: 768px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+        /* Form */
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 6px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px;
+            font-size: 14px; transition: border-color 0.2s; outline: none;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #1a73e8; }
+        .form-group textarea { resize: vertical; min-height: 80px; }
+
+        /* Buttons */
+        .btn { padding: 10px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: #1a73e8; color: #fff; }
+        .btn-primary:hover { background: #1557b0; }
+        .btn-secondary { background: #f0f2f5; color: #333; border: 1px solid #ddd; }
+        .btn-secondary:hover { background: #e0e2e5; }
+        .btn-success { background: #0f9d58; color: #fff; }
+        .btn-success:hover { background: #0b8043; }
+        .btn-danger { background: #ea4335; color: #fff; }
+        .btn-danger:hover { background: #c5221f; }
+        .btn-sm { padding: 6px 14px; font-size: 12px; }
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        /* Table */
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #f8f9fa; padding: 10px 12px; text-align: left; font-weight: 600; color: #555; border-bottom: 2px solid #e0e0e0; white-space: nowrap; }
+        td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+        tr:hover { background: #f8f9ff; }
+
+        /* Badge */
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .badge-blue { background: #e3f2fd; color: #1565c0; }
+        .badge-green { background: #e8f5e9; color: #2e7d32; }
+        .badge-orange { background: #fff3e0; color: #e65100; }
+        .badge-red { background: #fce4ec; color: #c62828; }
+        .badge-purple { background: #f3e5f5; color: #6a1b9a; }
+        .badge-gray { background: #f5f5f5; color: #616161; }
+
+        /* Timeline / Gantt */
+        .timeline { position: relative; padding-left: 30px; }
+        .timeline::before { content: ''; position: absolute; left: 10px; top: 0; bottom: 0; width: 2px; background: #e0e0e0; }
+        .timeline-item { position: relative; margin-bottom: 20px; }
+        .timeline-item::before { content: ''; position: absolute; left: -24px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: #1a73e8; border: 2px solid #fff; box-shadow: 0 0 0 2px #1a73e8; }
+        .timeline-item.completed::before { background: #0f9d58; box-shadow: 0 0 0 2px #0f9d58; }
+        .timeline-item.current::before { background: #f9ab00; box-shadow: 0 0 0 2px #f9ab00; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 2px #f9ab00; } 50% { box-shadow: 0 0 0 6px rgba(249,171,0,0.3); } }
+        .timeline-header { font-weight: 600; font-size: 14px; }
+        .timeline-date { font-size: 12px; color: #888; margin-top: 2px; }
+        .timeline-desc { font-size: 13px; color: #666; margin-top: 4px; }
+
+        /* Gantt Chart */
+        .gantt-container { overflow-x: auto; padding: 10px 0; }
+        .gantt-row { display: flex; align-items: center; margin-bottom: 6px; }
+        .gantt-label { width: 160px; min-width: 160px; font-size: 12px; font-weight: 500; padding-right: 10px; text-align: right; }
+        .gantt-bar-area { flex: 1; height: 28px; position: relative; background: #f5f5f5; border-radius: 4px; }
+        .gantt-bar { position: absolute; height: 100%; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #fff; font-weight: 600; min-width: 20px; }
+        .gantt-months { display: flex; margin-left: 160px; margin-bottom: 8px; }
+        .gantt-month { flex: 1; font-size: 11px; color: #888; text-align: center; border-left: 1px solid #eee; padding: 4px 0; }
+
+        /* Checklist */
+        .checklist-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+        .checklist-item:last-child { border-bottom: none; }
+        .checklist-item input[type="checkbox"] { margin-top: 3px; width: 18px; height: 18px; accent-color: #1a73e8; }
+        .checklist-label { flex: 1; }
+        .checklist-label .title { font-weight: 600; font-size: 14px; }
+        .checklist-label .desc { font-size: 12px; color: #888; margin-top: 2px; }
+
+        /* Search result */
+        .search-result { border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-bottom: 12px; transition: box-shadow 0.2s; }
+        .search-result:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .search-result h4 { font-size: 15px; margin-bottom: 6px; }
+        .search-result .meta { font-size: 12px; color: #888; display: flex; gap: 16px; flex-wrap: wrap; }
+
+        /* Stats */
+        .stat-card { text-align: center; padding: 20px; }
+        .stat-number { font-size: 32px; font-weight: 700; color: #1a73e8; }
+        .stat-label { font-size: 13px; color: #888; margin-top: 4px; }
+
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; align-items: center; justify-content: center; }
+        .modal-overlay.show { display: flex; }
+        .modal { background: #fff; border-radius: 16px; padding: 32px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal-title { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+
+        /* Progress Bar */
+        .progress-bar { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+
+        /* Tabs within cards */
+        .inner-tabs { display: flex; gap: 0; border-bottom: 2px solid #e0e0e0; margin-bottom: 16px; }
+        .inner-tab { padding: 10px 20px; cursor: pointer; font-size: 14px; font-weight: 500; color: #888; border-bottom: 2px solid transparent; margin-bottom: -2px; }
+        .inner-tab.active { color: #1a73e8; border-bottom-color: #1a73e8; }
+
+        /* Loading */
+        .loading { text-align: center; padding: 40px; color: #888; }
+        .spinner { display: inline-block; width: 30px; height: 30px; border: 3px solid #e0e0e0; border-top-color: #1a73e8; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Alert */
+        .alert { padding: 12px 16px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+        .alert-info { background: #e3f2fd; color: #1565c0; }
+        .alert-warning { background: #fff3e0; color: #e65100; }
+        .alert-success { background: #e8f5e9; color: #2e7d32; }
+
+        /* API Status */
+        .api-status { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+        .api-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .api-dot.connected { background: #0f9d58; }
+        .api-dot.disconnected { background: #ea4335; }
+
+        /* Project card */
+        .project-card { border: 1px solid #e0e0e0; border-radius: 12px; padding: 20px; margin-bottom: 16px; cursor: pointer; transition: all 0.2s; }
+        .project-card:hover { border-color: #1a73e8; box-shadow: 0 2px 12px rgba(26,115,232,0.15); }
+        .project-card .project-header { display: flex; justify-content: space-between; align-items: flex-start; }
+        .project-card .project-name { font-size: 16px; font-weight: 700; }
+        .project-card .project-meta { font-size: 12px; color: #888; margin-top: 6px; display: flex; gap: 16px; }
+        .project-progress { margin-top: 12px; }
+        .project-progress .progress-text { font-size: 12px; color: #888; margin-bottom: 4px; display: flex; justify-content: space-between; }
+    </style>
+</head>
+<body>
+
+<!-- Navigation -->
+<div class="nav">
+    <div class="nav-inner">
+        <div class="nav-logo">
+            OEM 스케줄러
+            <span>식품 신제품 개발 관리</span>
+        </div>
+        <div class="nav-tabs">
+            <div class="nav-tab active" onclick="switchTab('dashboard')">대시보드</div>
+            <div class="nav-tab" onclick="switchTab('schedule')">생산일정 계산기</div>
+            <div class="nav-tab" onclick="switchTab('checklist')">개발 체크리스트</div>
+            <div class="nav-tab" onclick="switchTab('manufacturer')">제조사 검색</div>
+            <div class="nav-tab" onclick="switchTab('projects')">프로젝트 관리</div>
+        </div>
+        <div style="margin-left:auto;">
+            <div class="api-status">
+                <div class="api-dot connected" id="apiDot"></div>
+                <span id="apiStatusText">API 연결됨</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- ========== TAB 1: 대시보드 ========== -->
+    <div class="tab-content active" id="tab-dashboard">
+        <div class="grid-3">
+            <div class="card stat-card">
+                <div class="stat-number" id="statProjects">0</div>
+                <div class="stat-label">진행 중 프로젝트</div>
+            </div>
+            <div class="card stat-card">
+                <div class="stat-number" id="statUpcoming">0</div>
+                <div class="stat-label">이번 달 마감</div>
+            </div>
+            <div class="card stat-card">
+                <div class="stat-number" id="statManufacturers">0</div>
+                <div class="stat-label">등록 제조사</div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-title">진행 중 프로젝트</div>
+                <div id="dashboardProjects">
+                    <p style="color:#888; font-size:14px;">프로젝트를 추가하면 여기에 표시됩니다.</p>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">다가오는 일정</div>
+                <div id="dashboardSchedule">
+                    <p style="color:#888; font-size:14px;">생산일정을 계산하면 여기에 표시됩니다.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">최근 검색한 제조사</div>
+            <div id="dashboardManufacturers">
+                <p style="color:#888; font-size:14px;">제조사를 검색하면 여기에 표시됩니다.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== TAB 2: 생산일정 계산기 ========== -->
+    <div class="tab-content" id="tab-schedule">
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-title">역산 생산일정 계산기</div>
+                <div class="alert alert-info">
+                    출시 희망일을 기준으로 각 단계별 시작일을 역으로 계산합니다.
+                </div>
+
+                <div class="form-group">
+                    <label>제품 유형</label>
+                    <select id="productType" onchange="updateScheduleForm()">
+                        <option value="health">건강기능식품 (고시형 원료)</option>
+                        <option value="health_individual">건강기능식품 (개별인정형 원료)</option>
+                        <option value="general">일반식품</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>제형</label>
+                    <select id="productForm">
+                        <option value="tablet">정제 (Tablet)</option>
+                        <option value="hard_capsule">경질캡슐 (Hard Capsule)</option>
+                        <option value="soft_capsule">연질캡슐 (Soft Capsule)</option>
+                        <option value="powder">분말/과립 (Powder)</option>
+                        <option value="liquid">액상 (Liquid)</option>
+                        <option value="jelly">젤리/구미 (Gummy)</option>
+                        <option value="stick">스틱 (Stick)</option>
+                        <option value="film">필름형 (Film)</option>
+                        <option value="dual">이중제형 (Dual)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>출시 희망일 (목표일)</label>
+                    <input type="date" id="targetDate" />
+                </div>
+
+                <div class="form-group">
+                    <label>생산 수량 (단위: 개)</label>
+                    <input type="number" id="productionQty" placeholder="예: 10000" value="10000" />
+                </div>
+
+                <div class="form-group">
+                    <label>포장 디자인 준비 상태</label>
+                    <select id="designReady">
+                        <option value="not_started">미착수</option>
+                        <option value="in_progress">진행 중</option>
+                        <option value="done">완료</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>바코드 발급 여부</label>
+                    <select id="barcodeReady">
+                        <option value="no">미발급</option>
+                        <option value="yes">발급 완료</option>
+                    </select>
+                </div>
+
+                <div class="btn-group">
+                    <button class="btn btn-primary" onclick="calculateSchedule()">일정 계산하기</button>
+                    <button class="btn btn-secondary" onclick="resetScheduleForm()">초기화</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">계산 결과</div>
+                <div id="scheduleResult">
+                    <p style="color:#888; font-size:14px;">왼쪽에서 정보를 입력하고 "일정 계산하기"를 클릭하세요.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="ganttCard" style="display:none;">
+            <div class="card-title">간트 차트</div>
+            <div class="gantt-container" id="ganttChart"></div>
+        </div>
+
+        <div class="card" id="timelineCard" style="display:none;">
+            <div class="card-title">단계별 타임라인</div>
+            <div class="timeline" id="timelineView"></div>
+        </div>
+    </div>
+
+    <!-- ========== TAB 3: 개발 체크리스트 ========== -->
+    <div class="tab-content" id="tab-checklist">
+        <div class="form-group" style="margin-bottom:20px;">
+            <select id="checklistType" onchange="renderChecklist()" style="max-width:300px;">
+                <option value="health">건강기능식품 체크리스트</option>
+                <option value="general">일반식품 체크리스트</option>
+            </select>
+        </div>
+
+        <div class="grid-2">
+            <div>
+                <div class="card">
+                    <div class="card-title">1단계: 기획 및 컨셉</div>
+                    <div id="checklist-phase1"></div>
+                </div>
+                <div class="card">
+                    <div class="card-title">2단계: 원료 및 배합</div>
+                    <div id="checklist-phase2"></div>
+                </div>
+                <div class="card">
+                    <div class="card-title">3단계: 시제품 개발</div>
+                    <div id="checklist-phase3"></div>
+                </div>
+            </div>
+            <div>
+                <div class="card">
+                    <div class="card-title">4단계: 인허가 및 신고</div>
+                    <div id="checklist-phase4"></div>
+                </div>
+                <div class="card">
+                    <div class="card-title">5단계: 포장 및 디자인</div>
+                    <div id="checklist-phase5"></div>
+                </div>
+                <div class="card">
+                    <div class="card-title">6단계: 양산 및 출하</div>
+                    <div id="checklist-phase6"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">전체 진행률</div>
+            <div class="project-progress">
+                <div class="progress-text">
+                    <span id="checklistProgressText">0 / 0 완료</span>
+                    <span id="checklistProgressPct">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="checklistProgressBar" style="width:0%; background:#1a73e8;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== TAB 4: 제조사 검색 ========== -->
+    <div class="tab-content" id="tab-manufacturer">
+        <div class="card">
+            <div class="card-title">식품안전나라 API 제조사 검색</div>
+            <div class="alert alert-info">
+                식품안전나라 OpenAPI를 활용하여 건강기능식품/일반식품 OEM 제조업체를 검색합니다. (제약사 제외)
+            </div>
+
+            <div class="inner-tabs">
+                <div class="inner-tab active" onclick="switchSearchTab('health_mfr')">건강기능식품 (C003)</div>
+                <div class="inner-tab" onclick="switchSearchTab('general_mfr')">일반식품 (I1250)</div>
+                <div class="inner-tab" onclick="switchSearchTab('haccp_mfr')">HACCP 인증업소</div>
+            </div>
+
+            <div class="grid-2" style="margin-bottom:16px;">
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>업소명 (제조사명)</label>
+                    <input type="text" id="searchCompany" placeholder="예: 콜마, 노바렉스, 서흥" />
+                </div>
+                <div class="form-group" style="margin-bottom:0;">
+                    <label>제품명</label>
+                    <input type="text" id="searchProduct" placeholder="예: 비타민, 루테인, 프로바이오틱스" />
+                </div>
+            </div>
+
+            <div class="btn-group" style="margin-bottom:16px;">
+                <button class="btn btn-primary" onclick="searchManufacturer()">검색</button>
+                <button class="btn btn-secondary" onclick="clearSearch()">초기화</button>
+            </div>
+
+            <div id="searchResults">
+                <p style="color:#888; font-size:14px;">검색어를 입력하고 검색 버튼을 클릭하세요.</p>
+            </div>
+            <div id="searchPagination" style="margin-top:16px; text-align:center;"></div>
+        </div>
+    </div>
+
+    <!-- ========== TAB 5: 프로젝트 관리 ========== -->
+    <div class="tab-content" id="tab-projects">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h2 style="font-size:20px; font-weight:700;">프로젝트 관리</h2>
+            <button class="btn btn-primary" onclick="openProjectModal()">+ 새 프로젝트</button>
+        </div>
+
+        <div id="projectList">
+            <div class="card" style="text-align:center; color:#888; padding:60px;">
+                <p style="font-size:16px; margin-bottom:8px;">아직 프로젝트가 없습니다</p>
+                <p style="font-size:13px;">새 프로젝트를 추가하여 시작하세요</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Project Modal -->
+<div class="modal-overlay" id="projectModal">
+    <div class="modal">
+        <div class="modal-title">새 프로젝트 만들기</div>
+        <div class="form-group">
+            <label>프로젝트명</label>
+            <input type="text" id="projName" placeholder="예: 비타민C 1000 출시 프로젝트" />
+        </div>
+        <div class="form-group">
+            <label>제품 유형</label>
+            <select id="projType">
+                <option value="health">건강기능식품</option>
+                <option value="general">일반식품</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>제형</label>
+            <select id="projForm">
+                <option value="tablet">정제</option>
+                <option value="hard_capsule">경질캡슐</option>
+                <option value="soft_capsule">연질캡슐</option>
+                <option value="powder">분말/과립</option>
+                <option value="liquid">액상</option>
+                <option value="jelly">젤리/구미</option>
+                <option value="stick">스틱</option>
+                <option value="film">필름형</option>
+                <option value="dual">이중제형</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>OEM 제조사</label>
+            <input type="text" id="projManufacturer" placeholder="예: 콜마비앤에이치" />
+        </div>
+        <div class="form-group">
+            <label>출시 목표일</label>
+            <input type="date" id="projTargetDate" />
+        </div>
+        <div class="form-group">
+            <label>메모</label>
+            <textarea id="projMemo" placeholder="프로젝트 관련 메모"></textarea>
+        </div>
+        <div class="btn-group" style="justify-content:flex-end; margin-top:20px;">
+            <button class="btn btn-secondary" onclick="closeProjectModal()">취소</button>
+            <button class="btn btn-primary" onclick="saveProject()">저장</button>
+        </div>
+    </div>
+</div>
+
+<!-- Project Detail Modal -->
+<div class="modal-overlay" id="projectDetailModal">
+    <div class="modal" style="max-width:800px;">
+        <div id="projectDetailContent"></div>
+        <div class="btn-group" style="justify-content:flex-end; margin-top:20px;">
+            <button class="btn btn-danger btn-sm" onclick="deleteCurrentProject()">삭제</button>
+            <button class="btn btn-secondary" onclick="closeProjectDetailModal()">닫기</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ============ CONFIG ============
+const API_KEY = '4c9bc13b8f484c678e8f';
+const API_BASE = 'https://openapi.foodsafetykorea.go.kr/api';
+
+// ============ STATE ============
+let currentTab = 'dashboard';
+let currentSearchTab = 'health_mfr';
+let projects = JSON.parse(localStorage.getItem('oem_projects') || '[]');
+let checklists = JSON.parse(localStorage.getItem('oem_checklists') || '{}');
+let recentManufacturers = JSON.parse(localStorage.getItem('oem_recent_mfr') || '[]');
+let currentProjectId = null;
+let searchPage = 1;
+
+// ============ SCHEDULE DATA ============
+const scheduleSteps = {
+    health: [
+        { id: 'concept', name: '제품 기획/컨셉 수립', minDays: 14, maxDays: 28, desc: '타겟 소비자, 기능성 방향, 경쟁제품 분석' },
+        { id: 'ingredient', name: '기능성 원료 검토', minDays: 7, maxDays: 14, desc: '고시형 원료(95종) 중 선택, 함량 결정' },
+        { id: 'formula', name: '배합 설계 (레시피)', minDays: 14, maxDays: 28, desc: 'OEM 연구원 배합비 설계, 부원료/부형제 선정' },
+        { id: 'sample', name: '시제품 제작/테스트', minDays: 21, maxDays: 42, desc: '소량 시제품 생산, 맛/안정성/용해도 테스트' },
+        { id: 'design', name: '포장 디자인/인쇄', minDays: 21, maxDays: 28, desc: '법정 표시사항 포함 라벨/포장 디자인, 인쇄' },
+        { id: 'barcode', name: '바코드 발급', minDays: 7, maxDays: 14, desc: 'GS1 Korea 업체코드 신청, GTIN 생성' },
+        { id: 'approval', name: '품목제조신고', minDays: 14, maxDays: 28, desc: '식약처 제출: 제조방법설명서, 시험검사성적서' },
+        { id: 'production', name: '양산 (GMP 공장)', minDays: 14, maxDays: 28, desc: 'GMP/HACCP 인증 공장 본생산' },
+        { id: 'qc', name: '품질검사 및 출하', minDays: 7, maxDays: 14, desc: '기능성분 함량, 미생물, 중금속 검사 후 출고' },
+    ],
+    health_individual: [
+        { id: 'concept', name: '제품 기획/컨셉 수립', minDays: 14, maxDays: 28, desc: '타겟 소비자, 기능성 방향, 경쟁제품 분석' },
+        { id: 'ingredient', name: '개별인정형 원료 인정 신청', minDays: 120, maxDays: 180, desc: '식약처 심사: 신규 120일, 기능성 추가 60일' },
+        { id: 'formula', name: '배합 설계 (레시피)', minDays: 14, maxDays: 28, desc: 'OEM 연구원 배합비 설계' },
+        { id: 'sample', name: '시제품 제작/테스트', minDays: 21, maxDays: 42, desc: '소량 시제품 생산, 임상시험 결과 반영' },
+        { id: 'design', name: '포장 디자인/인쇄', minDays: 21, maxDays: 28, desc: '법정 표시사항 포함 라벨/포장 디자인' },
+        { id: 'barcode', name: '바코드 발급', minDays: 7, maxDays: 14, desc: 'GS1 Korea 업체코드 신청' },
+        { id: 'approval', name: '품목제조신고', minDays: 14, maxDays: 28, desc: '식약처 제출 + 개별인정형 원료 인정서류' },
+        { id: 'production', name: '양산 (GMP 공장)', minDays: 14, maxDays: 28, desc: 'GMP/HACCP 인증 공장 본생산' },
+        { id: 'qc', name: '품질검사 및 출하', minDays: 7, maxDays: 14, desc: '기능성분 함량 검사 후 출고' },
+    ],
+    general: [
+        { id: 'concept', name: '제품 기획/컨셉 수립', minDays: 7, maxDays: 14, desc: '제품 유형, 타겟 시장, 맛/형태 결정' },
+        { id: 'ingredient', name: '레시피 개발/원료 소싱', minDays: 14, maxDays: 28, desc: '원재료 선정, 배합비 설계, 공급업체 확보' },
+        { id: 'sample', name: '시제품 제작/테스트', minDays: 14, maxDays: 28, desc: '소량 생산, 관능평가, 보존성 테스트' },
+        { id: 'design', name: '포장 디자인/인쇄', minDays: 14, maxDays: 21, desc: '식품표시기준 라벨, 포장재 선정' },
+        { id: 'barcode', name: '바코드 발급', minDays: 5, maxDays: 10, desc: 'GS1 Korea 바코드 발급' },
+        { id: 'report', name: '품목제조보고', minDays: 1, maxDays: 7, desc: '관할 시/군/구청 보고' },
+        { id: 'production', name: '양산 및 품질검사', minDays: 14, maxDays: 28, desc: 'HACCP 공장 제조, 자가품질검사' },
+        { id: 'qc', name: '출하', minDays: 3, maxDays: 7, desc: '포장 완료 후 출고' },
+    ]
+};
+
+// ============ CHECKLIST DATA ============
+const checklistData = {
+    health: {
+        phase1: [
+            { title: '타겟 소비자층 정의', desc: '연령, 성별, 건강 고민 등' },
+            { title: '경쟁제품 분석', desc: '시장 내 유사 제품 가격/성분/마케팅 분석' },
+            { title: '기능성 방향 결정', desc: '면역, 피로, 눈건강, 장건강 등' },
+            { title: '제형 결정', desc: '정제, 캡슐, 분말, 젤리, 액상, 스틱 등' },
+            { title: '목표 가격대 설정', desc: '원가율 및 시장가 기반 소비자가 산정' },
+            { title: '브랜드명/제품명 결정', desc: '상표 등록 가능 여부 확인' },
+        ],
+        phase2: [
+            { title: '기능성 원료 유형 결정', desc: '고시형(95종) vs 개별인정형' },
+            { title: '주원료 선정 및 함량 결정', desc: '일일섭취량 기준 충족 여부 확인' },
+            { title: '부원료/부형제 선정', desc: '맛, 안정성, 제형 적합성 검토' },
+            { title: '원료 공급업체 확보', desc: '원료 규격서, 시험성적서 확보' },
+            { title: '배합비 설계 완료', desc: 'OEM 연구원과 협의하여 최종 배합비 확정' },
+            { title: '원가 계산', desc: '원료비 + 제조비 + 포장비 원가 산출' },
+        ],
+        phase3: [
+            { title: '시제품 제작 의뢰', desc: 'OEM 업체에 소량 시제품 요청' },
+            { title: '관능평가 (맛/향/색)', desc: '시제품 맛, 향, 색상, 질감 평가' },
+            { title: '안정성 테스트', desc: '가속시험, 장기보존시험' },
+            { title: '기능성분 함량 분석', desc: '공인 시험기관 분석 의뢰' },
+            { title: '배합 보완/확정', desc: '테스트 결과 반영 최종 배합비 확정' },
+        ],
+        phase4: [
+            { title: '유통전문판매업 신고', desc: '관할 시군구청 (교육필증 4시간 필요)' },
+            { title: '제조방법설명서 작성', desc: '원료 입고~출하 전 공정 기록' },
+            { title: '시험검사성적서 확보', desc: '기준규격 적합 확인 검사' },
+            { title: '유통기한 설정 사유서', desc: '자체 또는 위탁 검사 근거 자료' },
+            { title: '품목제조신고서 제출', desc: '식약처 온라인 제출' },
+            { title: '품목제조신고 완료', desc: '신고번호 수령 확인' },
+        ],
+        phase5: [
+            { title: '법정 필수표시사항 확인', desc: '건강기능식품 마크, 기능성분, 섭취주의사항 등' },
+            { title: '포장 디자인 시안 제작', desc: '표면/이면/측면 디자인' },
+            { title: '표시사항 법적 검토', desc: '기능성 표현 적합성 확인 (질병예방 표현 금지)' },
+            { title: '바코드 발급 (GS1 Korea)', desc: 'KAN코드 업체코드 신청 후 GTIN 생성' },
+            { title: '포장재 인쇄/제작', desc: '인쇄 교정 확인 후 양산 발주' },
+        ],
+        phase6: [
+            { title: 'OEM 제조 계약서 체결', desc: '위탁생산 계약 조건 확정' },
+            { title: 'GMP 공장 양산 개시', desc: '원료 입고, 배합, 성형, 포장' },
+            { title: '품질검사 (QC)', desc: '기능성분 함량, 미생물, 중금속 검사' },
+            { title: '포장 및 라벨링', desc: '최종 포장, 라벨 부착, 박스 포장' },
+            { title: '출하 검사 완료', desc: '최종 출하 전 검사 통과' },
+            { title: '물류 배송 시작', desc: '창고 입고 및 배송 개시' },
+        ],
+    },
+    general: {
+        phase1: [
+            { title: '타겟 소비자층 정의', desc: '연령, 성별, 라이프스타일' },
+            { title: '경쟁제품 분석', desc: '시장 내 유사 제품 분석' },
+            { title: '제품 유형/카테고리 결정', desc: '과자류, 음료, 즉석식품 등' },
+            { title: '맛/향미 방향 결정', desc: '핵심 맛 프로필 설정' },
+            { title: '목표 가격대 설정', desc: '유통채널별 가격 전략' },
+            { title: '브랜드명/제품명 결정', desc: '상표 등록 확인' },
+        ],
+        phase2: [
+            { title: '주원재료 선정', desc: '핵심 원재료 및 규격 결정' },
+            { title: '부재료/첨가물 선정', desc: '향료, 감미료, 보존료 등' },
+            { title: '원료 공급업체 확보', desc: '원료 공급 안정성 확인' },
+            { title: '배합비 설계', desc: '레시피 개발 및 최적화' },
+            { title: '알레르기 유발물질 확인', desc: '22종 알레르기 유발물질 점검' },
+            { title: '원가 계산', desc: '원료비 + 제조비 + 포장비' },
+        ],
+        phase3: [
+            { title: '시제품 제작', desc: 'OEM 업체 소량 시제품' },
+            { title: '관능평가', desc: '맛, 향, 색, 질감 종합 평가' },
+            { title: '보존성/안정성 테스트', desc: '유통기한 설정 근거 마련' },
+            { title: '영양성분 분석', desc: '영양성분 표시용 분석' },
+            { title: '레시피 확정', desc: '최종 배합비 확정' },
+        ],
+        phase4: [
+            { title: '제조방법설명서 작성', desc: '전 공정 기록' },
+            { title: '소비기한 설정 사유서', desc: '검사 근거 자료 준비' },
+            { title: '영양성분 정보 등록', desc: '2023.7.1부터 의무화' },
+            { title: '품목제조보고', desc: '관할 시군구청 보고 (생산 후 7일 이내)' },
+            { title: '자가품질검사 계획 수립', desc: '검사 주기 및 항목 결정' },
+        ],
+        phase5: [
+            { title: '식품표시기준 확인', desc: '제품명, 식품유형, 영양성분 등' },
+            { title: '포장 디자인 시안', desc: '표면/이면 디자인' },
+            { title: '알레르기 표시 확인', desc: '알레르기 유발 원료 표시' },
+            { title: '바코드 발급', desc: 'GS1 Korea KAN코드' },
+            { title: '포장재 인쇄/제작', desc: '교정 확인 후 양산' },
+        ],
+        phase6: [
+            { title: 'OEM 계약서 체결', desc: '위탁생산 계약' },
+            { title: 'HACCP 공장 양산', desc: '본생산 개시' },
+            { title: '자가품질검사', desc: '미생물, 이물 등 검사' },
+            { title: '포장/라벨링 완료', desc: '최종 포장' },
+            { title: '출하', desc: '물류 배송 개시' },
+        ],
+    }
+};
+
+// ============ TAB NAVIGATION ============
+function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.nav-tab').forEach((t, i) => {
+        const tabs = ['dashboard','schedule','checklist','manufacturer','projects'];
+        t.classList.toggle('active', tabs[i] === tab);
+    });
+    document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    if (tab === 'dashboard') updateDashboard();
+    if (tab === 'checklist') renderChecklist();
+    if (tab === 'projects') renderProjects();
+}
+
+function switchSearchTab(tab) {
+    currentSearchTab = tab;
+    document.querySelectorAll('#tab-manufacturer .inner-tab').forEach((t, i) => {
+        const tabs = ['health_mfr','general_mfr','haccp_mfr'];
+        t.classList.toggle('active', tabs[i] === tab);
+    });
+}
+
+// ============ SCHEDULE CALCULATOR ============
+function calculateSchedule() {
+    const type = document.getElementById('productType').value;
+    const targetDateStr = document.getElementById('targetDate').value;
+    const designReady = document.getElementById('designReady').value;
+    const barcodeReady = document.getElementById('barcodeReady').value;
+
+    if (!targetDateStr) {
+        alert('출시 희망일을 선택해주세요.');
+        return;
+    }
+
+    const targetDate = new Date(targetDateStr);
+    const steps = JSON.parse(JSON.stringify(scheduleSteps[type]));
+
+    // Adjust for design/barcode readiness
+    steps.forEach(s => {
+        if (s.id === 'design' && designReady === 'done') { s.minDays = 0; s.maxDays = 0; }
+        if (s.id === 'design' && designReady === 'in_progress') { s.minDays = Math.floor(s.minDays/2); s.maxDays = Math.floor(s.maxDays/2); }
+        if (s.id === 'barcode' && barcodeReady === 'yes') { s.minDays = 0; s.maxDays = 0; }
+    });
+
+    // Calculate backwards from target date (using average days)
+    let dates = [];
+    let currentEnd = new Date(targetDate);
+    for (let i = steps.length - 1; i >= 0; i--) {
+        const avgDays = Math.round((steps[i].minDays + steps[i].maxDays) / 2);
+        const stepEnd = new Date(currentEnd);
+        const stepStart = new Date(currentEnd);
+        stepStart.setDate(stepStart.getDate() - avgDays);
+        dates.unshift({ ...steps[i], start: new Date(stepStart), end: new Date(stepEnd), days: avgDays });
+        currentEnd = new Date(stepStart);
+    }
+
+    const startDate = dates[0].start;
+    const totalDays = Math.round((targetDate - startDate) / (1000*60*60*24));
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const daysFromNow = Math.round((startDate - today) / (1000*60*60*24));
+
+    // Render result
+    let html = `
+        <div class="alert ${daysFromNow < 0 ? 'alert-warning' : 'alert-success'}">
+            ${daysFromNow < 0
+                ? `<strong>주의:</strong> 시작일이 이미 ${Math.abs(daysFromNow)}일 지났습니다. 출시일을 조정하거나 일정을 압축해야 합니다.`
+                : `<strong>시작 가능일:</strong> ${formatDate(startDate)} (${daysFromNow}일 후)`
+            }
+        </div>
+        <table>
+            <tr><th>총 소요기간</th><td><strong>${totalDays}일</strong> (약 ${Math.round(totalDays/30)}개월)</td></tr>
+            <tr><th>시작일</th><td>${formatDate(startDate)}</td></tr>
+            <tr><th>출시 목표일</th><td>${formatDate(targetDate)}</td></tr>
+            <tr><th>제품 유형</th><td>${type === 'health' ? '건강기능식품 (고시형)' : type === 'health_individual' ? '건강기능식품 (개별인정형)' : '일반식품'}</td></tr>
+        </table>
+        <h4 style="margin-top:20px; margin-bottom:12px;">단계별 일정</h4>
+        <table>
+            <tr><th>단계</th><th>시작일</th><th>종료일</th><th>소요일</th></tr>
+            ${dates.map(d => `
+                <tr>
+                    <td><strong>${d.name}</strong><br><span style="font-size:11px;color:#888;">${d.desc}</span></td>
+                    <td>${formatDate(d.start)}</td>
+                    <td>${formatDate(d.end)}</td>
+                    <td>${d.days}일</td>
+                </tr>
+            `).join('')}
+        </table>
+    `;
+    document.getElementById('scheduleResult').innerHTML = html;
+
+    // Render Gantt chart
+    renderGantt(dates, startDate, targetDate);
+
+    // Render Timeline
+    renderTimeline(dates, today);
+
+    document.getElementById('ganttCard').style.display = 'block';
+    document.getElementById('timelineCard').style.display = 'block';
+}
+
+function renderGantt(dates, startDate, endDate) {
+    const totalDays = Math.round((endDate - startDate) / (1000*60*60*24));
+    const colors = ['#1a73e8','#0f9d58','#f9ab00','#ea4335','#ab47bc','#00acc1','#ff7043','#8d6e63','#78909c'];
+
+    // Month headers
+    let months = [];
+    let d = new Date(startDate);
+    while (d <= endDate) {
+        months.push({ year: d.getFullYear(), month: d.getMonth() });
+        d.setMonth(d.getMonth() + 1);
+    }
+
+    let monthsHtml = months.map(m => `<div class="gantt-month">${m.year}.${String(m.month+1).padStart(2,'0')}</div>`).join('');
+
+    let barsHtml = dates.map((step, i) => {
+        const offsetDays = Math.round((step.start - startDate) / (1000*60*60*24));
+        const leftPct = (offsetDays / totalDays * 100);
+        const widthPct = Math.max(step.days / totalDays * 100, 1);
+        return `
+            <div class="gantt-row">
+                <div class="gantt-label">${step.name}</div>
+                <div class="gantt-bar-area">
+                    <div class="gantt-bar" style="left:${leftPct}%;width:${widthPct}%;background:${colors[i % colors.length]};" title="${step.name}: ${formatDate(step.start)} ~ ${formatDate(step.end)}">
+                        ${step.days}d
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    document.getElementById('ganttChart').innerHTML = `
+        <div class="gantt-months">${monthsHtml}</div>
+        ${barsHtml}
+    `;
+}
+
+function renderTimeline(dates, today) {
+    let html = dates.map(d => {
+        let status = '';
+        if (today > d.end) status = 'completed';
+        else if (today >= d.start && today <= d.end) status = 'current';
+        return `
+            <div class="timeline-item ${status}">
+                <div class="timeline-header">${d.name}</div>
+                <div class="timeline-date">${formatDate(d.start)} ~ ${formatDate(d.end)} (${d.days}일)</div>
+                <div class="timeline-desc">${d.desc}</div>
+            </div>
+        `;
+    }).join('');
+    document.getElementById('timelineView').innerHTML = html;
+}
+
+function resetScheduleForm() {
+    document.getElementById('productType').value = 'health';
+    document.getElementById('productForm').value = 'tablet';
+    document.getElementById('targetDate').value = '';
+    document.getElementById('productionQty').value = '10000';
+    document.getElementById('designReady').value = 'not_started';
+    document.getElementById('barcodeReady').value = 'no';
+    document.getElementById('scheduleResult').innerHTML = '<p style="color:#888; font-size:14px;">왼쪽에서 정보를 입력하고 "일정 계산하기"를 클릭하세요.</p>';
+    document.getElementById('ganttCard').style.display = 'none';
+    document.getElementById('timelineCard').style.display = 'none';
+}
+
+// ============ CHECKLIST ============
+function renderChecklist() {
+    const type = document.getElementById('checklistType').value;
+    const data = checklistData[type];
+    const saved = checklists[type] || {};
+
+    for (let phase = 1; phase <= 6; phase++) {
+        const key = 'phase' + phase;
+        const items = data[key] || [];
+        const container = document.getElementById('checklist-' + key);
+        if (!container) continue;
+
+        container.innerHTML = items.map((item, i) => {
+            const id = `${type}_${key}_${i}`;
+            const checked = saved[id] ? 'checked' : '';
+            return `
+                <div class="checklist-item">
+                    <input type="checkbox" id="${id}" ${checked} onchange="toggleChecklist('${type}','${id}')">
+                    <label class="checklist-label" for="${id}">
+                        <div class="title">${item.title}</div>
+                        <div class="desc">${item.desc}</div>
+                    </label>
+                </div>
+            `;
+        }).join('');
+    }
+    updateChecklistProgress(type);
+}
+
+function toggleChecklist(type, id) {
+    if (!checklists[type]) checklists[type] = {};
+    checklists[type][id] = !checklists[type][id];
+    localStorage.setItem('oem_checklists', JSON.stringify(checklists));
+    updateChecklistProgress(type);
+}
+
+function updateChecklistProgress(type) {
+    const data = checklistData[type];
+    let total = 0, done = 0;
+    const saved = checklists[type] || {};
+    for (let phase = 1; phase <= 6; phase++) {
+        const items = data['phase' + phase] || [];
+        total += items.length;
+        items.forEach((_, i) => {
+            if (saved[`${type}_phase${phase}_${i}`]) done++;
+        });
+    }
+    const pct = total > 0 ? Math.round(done / total * 100) : 0;
+    document.getElementById('checklistProgressText').textContent = `${done} / ${total} 완료`;
+    document.getElementById('checklistProgressPct').textContent = `${pct}%`;
+    document.getElementById('checklistProgressBar').style.width = pct + '%';
+}
+
+// ============ MANUFACTURER SEARCH (API) ============
+async function searchManufacturer() {
+    const company = document.getElementById('searchCompany').value.trim();
+    const product = document.getElementById('searchProduct').value.trim();
+
+    if (!company && !product) {
+        alert('업소명 또는 제품명을 입력해주세요.');
+        return;
+    }
+
+    const resultsDiv = document.getElementById('searchResults');
+    resultsDiv.innerHTML = '<div class="loading"><div class="spinner"></div><p style="margin-top:12px;">검색 중...</p></div>';
+
+    let serviceId, params = '';
+    if (currentSearchTab === 'health_mfr') {
+        serviceId = 'C003';
+        if (company) params += `&BSSH_NM=${encodeURIComponent(company)}`;
+        if (product) params += `&PRDLST_NM=${encodeURIComponent(product)}`;
+    } else if (currentSearchTab === 'general_mfr') {
+        serviceId = 'I1250';
+        if (company) params += `&BSSH_NM=${encodeURIComponent(company)}`;
+        if (product) params += `&PRDLST_NM=${encodeURIComponent(product)}`;
+    } else {
+        serviceId = 'I0500';
+        if (company) params += `&BSSH_NM=${encodeURIComponent(company)}`;
+    }
+
+    const start = (searchPage - 1) * 20 + 1;
+    const end = start + 19;
+
+    // Build URL based on API format - path-based parameters
+    let url;
+    if (currentSearchTab === 'health_mfr') {
+        // C003 uses path-based parameters
+        let pathParams = [];
+        if (company) pathParams.push(`BSSH_NM=${encodeURIComponent(company)}`);
+        if (product) pathParams.push(`PRDLST_NM=${encodeURIComponent(product)}`);
+        url = `${API_BASE}/${API_KEY}/${serviceId}/json/${start}/${end}${pathParams.length ? '?' + pathParams.join('&') : ''}`;
+    } else if (currentSearchTab === 'general_mfr') {
+        let pathParams = [];
+        if (company) pathParams.push(`BSSH_NM=${encodeURIComponent(company)}`);
+        if (product) pathParams.push(`PRDLST_NM=${encodeURIComponent(product)}`);
+        url = `${API_BASE}/${API_KEY}/${serviceId}/json/${start}/${end}${pathParams.length ? '?' + pathParams.join('&') : ''}`;
+    } else {
+        let pathParams = [];
+        if (company) pathParams.push(`BSSH_NM=${encodeURIComponent(company)}`);
+        url = `${API_BASE}/${API_KEY}/${serviceId}/json/${start}/${end}${pathParams.length ? '?' + pathParams.join('&') : ''}`;
+    }
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        const serviceData = data[serviceId];
+
+        if (!serviceData || serviceData.RESULT?.CODE !== 'INFO-000') {
+            const msg = serviceData?.RESULT?.MSG || '데이터를 가져올 수 없습니다.';
+            resultsDiv.innerHTML = `<div class="alert alert-warning">${msg}</div>`;
+            return;
+        }
+
+        const rows = serviceData.row || [];
+        const totalCount = parseInt(serviceData.total_count) || 0;
+
+        // Filter out pharmaceutical companies
+        const filtered = rows.filter(r => {
+            const name = (r.BSSH_NM || '').toLowerCase();
+            return !name.includes('제약') && !name.includes('약품') && !name.includes('pharma');
+        });
+
+        if (filtered.length === 0) {
+            resultsDiv.innerHTML = '<div class="alert alert-warning">검색 결과가 없습니다. (제약사 제외)</div>';
+            return;
+        }
+
+        // Save to recent
+        if (company && !recentManufacturers.includes(company)) {
+            recentManufacturers.unshift(company);
+            if (recentManufacturers.length > 10) recentManufacturers.pop();
+            localStorage.setItem('oem_recent_mfr', JSON.stringify(recentManufacturers));
+        }
+
+        let html = `<p style="font-size:13px; color:#888; margin-bottom:12px;">총 ${totalCount}건 중 ${filtered.length}건 표시 (제약사 제외)</p>`;
+
+        if (currentSearchTab === 'health_mfr') {
+            html += '<div class="table-wrap"><table><tr><th>업소명</th><th>제품명</th><th>기능성</th><th>제형</th><th>원재료</th><th>신고일</th></tr>';
+            filtered.forEach(r => {
+                html += `<tr>
+                    <td><strong>${r.BSSH_NM || '-'}</strong></td>
+                    <td>${r.PRDLST_NM || '-'}</td>
+                    <td style="max-width:200px;font-size:12px;">${(r.PRIMARY_FNCLTY || '-').substring(0, 100)}${(r.PRIMARY_FNCLTY||'').length>100?'...':''}</td>
+                    <td><span class="badge badge-blue">${r.PRDT_SHAP_CD_NM || r.SHAP || '-'}</span></td>
+                    <td style="max-width:200px;font-size:11px;">${(r.RAWMTRL_NM || '-').substring(0, 80)}${(r.RAWMTRL_NM||'').length>80?'...':''}</td>
+                    <td style="white-space:nowrap;">${r.PRMS_DT || '-'}</td>
+                </tr>`;
+            });
+            html += '</table></div>';
+        } else if (currentSearchTab === 'general_mfr') {
+            html += '<div class="table-wrap"><table><tr><th>업소명</th><th>제품명</th><th>식품유형</th><th>업종</th><th>유통기한</th></tr>';
+            filtered.forEach(r => {
+                html += `<tr>
+                    <td><strong>${r.BSSH_NM || '-'}</strong></td>
+                    <td>${r.PRDLST_NM || '-'}</td>
+                    <td><span class="badge badge-green">${r.PRDLST_DCNM || '-'}</span></td>
+                    <td>${r.INDUTY_CD_NM || '-'}</td>
+                    <td>${r.POG_DAYCNT || '-'}</td>
+                </tr>`;
+            });
+            html += '</table></div>';
+        } else {
+            html += '<div class="table-wrap"><table><tr><th>업소명</th><th>소재지</th><th>업종</th><th>HACCP인증</th></tr>';
+            filtered.forEach(r => {
+                html += `<tr>
+                    <td><strong>${r.BSSH_NM || '-'}</strong></td>
+                    <td style="font-size:12px;">${r.SITE_ADDR || r.ADDR || '-'}</td>
+                    <td>${r.INDUTY_NM || r.INDUTY_CD_NM || '-'}</td>
+                    <td><span class="badge badge-green">HACCP</span></td>
+                </tr>`;
+            });
+            html += '</table></div>';
+        }
+
+        // Pagination
+        const totalPages = Math.ceil(totalCount / 20);
+        if (totalPages > 1) {
+            let pagHtml = '<div style="margin-top:16px; text-align:center;">';
+            if (searchPage > 1) pagHtml += `<button class="btn btn-sm btn-secondary" onclick="goPage(${searchPage-1})">이전</button> `;
+            pagHtml += `<span style="margin:0 12px; font-size:13px;">${searchPage} / ${totalPages} 페이지</span>`;
+            if (searchPage < totalPages) pagHtml += ` <button class="btn btn-sm btn-secondary" onclick="goPage(${searchPage+1})">다음</button>`;
+            pagHtml += '</div>';
+            html += pagHtml;
+        }
+
+        resultsDiv.innerHTML = html;
+
+    } catch (err) {
+        resultsDiv.innerHTML = `<div class="alert alert-warning">API 호출 오류: ${err.message}<br><span style="font-size:12px;">CORS 정책으로 인해 로컬에서는 직접 호출이 제한될 수 있습니다. 서버 프록시를 사용하세요.</span></div>`;
+    }
+}
+
+function goPage(page) {
+    searchPage = page;
+    searchManufacturer();
+}
+
+function clearSearch() {
+    document.getElementById('searchCompany').value = '';
+    document.getElementById('searchProduct').value = '';
+    searchPage = 1;
+    document.getElementById('searchResults').innerHTML = '<p style="color:#888; font-size:14px;">검색어를 입력하고 검색 버튼을 클릭하세요.</p>';
+}
+
+// ============ PROJECTS ============
+function openProjectModal() {
+    document.getElementById('projectModal').classList.add('show');
+    // Set default target date to 4 months from now
+    const d = new Date();
+    d.setMonth(d.getMonth() + 4);
+    document.getElementById('projTargetDate').value = d.toISOString().split('T')[0];
+}
+
+function closeProjectModal() {
+    document.getElementById('projectModal').classList.remove('show');
+}
+
+function saveProject() {
+    const name = document.getElementById('projName').value.trim();
+    if (!name) { alert('프로젝트명을 입력해주세요.'); return; }
+
+    const project = {
+        id: Date.now().toString(),
+        name: name,
+        type: document.getElementById('projType').value,
+        form: document.getElementById('projForm').value,
+        manufacturer: document.getElementById('projManufacturer').value.trim(),
+        targetDate: document.getElementById('projTargetDate').value,
+        memo: document.getElementById('projMemo').value.trim(),
+        createdAt: new Date().toISOString(),
+        status: 'active',
+        checklist: {}
+    };
+
+    projects.push(project);
+    localStorage.setItem('oem_projects', JSON.stringify(projects));
+    closeProjectModal();
+    renderProjects();
+    updateDashboard();
+
+    // Clear form
+    document.getElementById('projName').value = '';
+    document.getElementById('projManufacturer').value = '';
+    document.getElementById('projMemo').value = '';
+}
+
+function renderProjects() {
+    const container = document.getElementById('projectList');
+    if (projects.length === 0) {
+        container.innerHTML = '<div class="card" style="text-align:center; color:#888; padding:60px;"><p style="font-size:16px; margin-bottom:8px;">아직 프로젝트가 없습니다</p><p style="font-size:13px;">새 프로젝트를 추가하여 시작하세요</p></div>';
+        return;
+    }
+
+    container.innerHTML = projects.map(p => {
+        const typeLabel = p.type === 'health' ? '건강기능식품' : '일반식품';
+        const formLabels = { tablet:'정제', hard_capsule:'경질캡슐', soft_capsule:'연질캡슐', powder:'분말', liquid:'액상', jelly:'젤리', stick:'스틱', film:'필름형', dual:'이중제형' };
+        const checkedCount = Object.values(p.checklist || {}).filter(Boolean).length;
+        const totalItems = getTotalChecklistItems(p.type);
+        const pct = totalItems > 0 ? Math.round(checkedCount / totalItems * 100) : 0;
+        const daysLeft = Math.round((new Date(p.targetDate) - new Date()) / (1000*60*60*24));
+
+        return `
+            <div class="project-card" onclick="openProjectDetail('${p.id}')">
+                <div class="project-header">
+                    <div>
+                        <div class="project-name">${p.name}</div>
+                        <div class="project-meta">
+                            <span><span class="badge badge-blue">${typeLabel}</span></span>
+                            <span><span class="badge badge-purple">${formLabels[p.form] || p.form}</span></span>
+                            ${p.manufacturer ? `<span>제조사: ${p.manufacturer}</span>` : ''}
+                            <span>목표: ${p.targetDate}</span>
+                        </div>
+                    </div>
+                    <span class="badge ${daysLeft < 30 ? 'badge-red' : daysLeft < 60 ? 'badge-orange' : 'badge-green'}">
+                        D${daysLeft > 0 ? '-' + daysLeft : '+' + Math.abs(daysLeft)}
+                    </span>
+                </div>
+                <div class="project-progress">
+                    <div class="progress-text">
+                        <span>진행률</span>
+                        <span>${pct}% (${checkedCount}/${totalItems})</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width:${pct}%; background:${pct >= 80 ? '#0f9d58' : pct >= 40 ? '#f9ab00' : '#1a73e8'};"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function getTotalChecklistItems(type) {
+    const data = checklistData[type] || checklistData['health'];
+    let total = 0;
+    for (let phase = 1; phase <= 6; phase++) {
+        total += (data['phase' + phase] || []).length;
+    }
+    return total;
+}
+
+function openProjectDetail(id) {
+    currentProjectId = id;
+    const p = projects.find(pr => pr.id === id);
+    if (!p) return;
+
+    const typeLabel = p.type === 'health' ? '건강기능식품' : '일반식품';
+    const data = checklistData[p.type] || checklistData['health'];
+
+    let checklistHtml = '';
+    for (let phase = 1; phase <= 6; phase++) {
+        const items = data['phase' + phase] || [];
+        const phaseNames = ['', '기획 및 컨셉', '원료 및 배합', '시제품 개발', '인허가 및 신고', '포장 및 디자인', '양산 및 출하'];
+        checklistHtml += `<h4 style="margin:16px 0 8px;">${phase}단계: ${phaseNames[phase]}</h4>`;
+        items.forEach((item, i) => {
+            const cid = `proj_${id}_phase${phase}_${i}`;
+            const checked = p.checklist?.[cid] ? 'checked' : '';
+            checklistHtml += `
+                <div class="checklist-item">
+                    <input type="checkbox" id="${cid}" ${checked} onchange="toggleProjectChecklist('${id}','${cid}')">
+                    <label class="checklist-label" for="${cid}">
+                        <div class="title">${item.title}</div>
+                        <div class="desc">${item.desc}</div>
+                    </label>
+                </div>
+            `;
+        });
+    }
+
+    document.getElementById('projectDetailContent').innerHTML = `
+        <div class="modal-title">${p.name}</div>
+        <div style="margin-bottom:16px; display:flex; gap:8px; flex-wrap:wrap;">
+            <span class="badge badge-blue">${typeLabel}</span>
+            ${p.manufacturer ? `<span class="badge badge-gray">제조사: ${p.manufacturer}</span>` : ''}
+            <span class="badge badge-orange">목표: ${p.targetDate}</span>
+        </div>
+        ${p.memo ? `<div class="alert alert-info" style="margin-bottom:16px;">${p.memo}</div>` : ''}
+        <h3 style="margin-bottom:12px;">개발 체크리스트</h3>
+        ${checklistHtml}
+    `;
+    document.getElementById('projectDetailModal').classList.add('show');
+}
+
+function toggleProjectChecklist(projectId, checklistId) {
+    const p = projects.find(pr => pr.id === projectId);
+    if (!p) return;
+    if (!p.checklist) p.checklist = {};
+    p.checklist[checklistId] = !p.checklist[checklistId];
+    localStorage.setItem('oem_projects', JSON.stringify(projects));
+}
+
+function closeProjectDetailModal() {
+    document.getElementById('projectDetailModal').classList.remove('show');
+    renderProjects();
+    updateDashboard();
+}
+
+function deleteCurrentProject() {
+    if (!confirm('이 프로젝트를 삭제하시겠습니까?')) return;
+    projects = projects.filter(p => p.id !== currentProjectId);
+    localStorage.setItem('oem_projects', JSON.stringify(projects));
+    closeProjectDetailModal();
+}
+
+// ============ DASHBOARD ============
+function updateDashboard() {
+    // Stats
+    const activeProjects = projects.filter(p => p.status === 'active');
+    document.getElementById('statProjects').textContent = activeProjects.length;
+
+    const thisMonth = new Date();
+    const upcoming = projects.filter(p => {
+        const d = new Date(p.targetDate);
+        return d.getMonth() === thisMonth.getMonth() && d.getFullYear() === thisMonth.getFullYear();
+    });
+    document.getElementById('statUpcoming').textContent = upcoming.length;
+    document.getElementById('statManufacturers').textContent = recentManufacturers.length;
+
+    // Active projects
+    const projDiv = document.getElementById('dashboardProjects');
+    if (activeProjects.length > 0) {
+        projDiv.innerHTML = activeProjects.slice(0, 5).map(p => {
+            const daysLeft = Math.round((new Date(p.targetDate) - new Date()) / (1000*60*60*24));
+            const checkedCount = Object.values(p.checklist || {}).filter(Boolean).length;
+            const totalItems = getTotalChecklistItems(p.type);
+            const pct = totalItems > 0 ? Math.round(checkedCount / totalItems * 100) : 0;
+            return `
+                <div style="padding:10px 0; border-bottom:1px solid #f0f0f0; cursor:pointer;" onclick="switchTab('projects')">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <strong style="font-size:14px;">${p.name}</strong>
+                        <span class="badge ${daysLeft < 30 ? 'badge-red' : 'badge-green'}">D${daysLeft > 0 ? '-' + daysLeft : '+' + Math.abs(daysLeft)}</span>
+                    </div>
+                    <div class="progress-bar" style="margin-top:6px;">
+                        <div class="progress-fill" style="width:${pct}%; background:#1a73e8;"></div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Recent manufacturers
+    const mfrDiv = document.getElementById('dashboardManufacturers');
+    if (recentManufacturers.length > 0) {
+        mfrDiv.innerHTML = `<div style="display:flex; gap:8px; flex-wrap:wrap;">
+            ${recentManufacturers.map(m => `<span class="badge badge-blue" style="cursor:pointer;" onclick="quickSearchMfr('${m}')">${m}</span>`).join('')}
+        </div>`;
+    }
+}
+
+function quickSearchMfr(name) {
+    switchTab('manufacturer');
+    document.getElementById('searchCompany').value = name;
+    searchManufacturer();
+}
+
+// ============ UTILS ============
+function formatDate(date) {
+    return `${date.getFullYear()}.${String(date.getMonth()+1).padStart(2,'0')}.${String(date.getDate()).padStart(2,'0')}`;
+}
+
+function updateScheduleForm() {
+    // Could add dynamic form changes based on product type
+}
+
+// ============ INIT ============
+document.addEventListener('DOMContentLoaded', () => {
+    // Set default target date
+    const d = new Date();
+    d.setMonth(d.getMonth() + 4);
+    document.getElementById('targetDate').value = d.toISOString().split('T')[0];
+
+    updateDashboard();
+    renderChecklist();
+});
+</script>
+</body>
+</html>
