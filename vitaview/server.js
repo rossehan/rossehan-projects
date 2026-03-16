@@ -1526,6 +1526,105 @@ app.get('/api/painpoint-analysis', async (req, res) => {
   }
 });
 
+// ===== MODULE 3: Entry Barrier & Legal Risk Checker =====
+app.get('/api/legal-barrier', async (req, res) => {
+  const category = req.query.category;
+  if (!category) return res.json({ error: 'Category parameter required' });
+
+  const catData = trendsCache?.categories?.[category];
+  if (!catData) return res.json({ error: 'Category data not found. Load trends first.' });
+
+  const catName = category.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim().toLowerCase();
+  const searchTerm = CATEGORY_KEYWORDS[category] || catName;
+
+  // 1. Brand Concentration Analysis (from SP-API data)
+  const brands = catData.brands || {};
+  const brandEntries = Object.entries(brands).sort((a, b) => b[1].count - a[1].count);
+  const totalProducts = catData.totalProducts || brandEntries.reduce((s, [, d]) => s + d.count, 0);
+  const topBrand = brandEntries[0];
+  const topBrandShare = topBrand ? Math.round(topBrand[1].count / totalProducts * 100) : 0;
+  const top3Share = brandEntries.slice(0, 3).reduce((s, [, d]) => s + d.count, 0) / Math.max(1, totalProducts) * 100;
+  const brandCount = brandEntries.length;
+  const hhi = catData.hhi || 0;
+
+  // 2. Trademark density estimation based on brand count
+  const trademarkDensity = Math.min(100, Math.round(brandCount * 2));
+
+  // 3. Legal barrier score calculation
+  // High HHI = monopolistic = harder to enter
+  // High top brand share = dominant player = harder
+  // Few brands = consolidated market = harder
+  const hhiScore = Math.min(100, Math.round(hhi / 100)); // 0-100
+  const dominanceScore = Math.min(100, Math.round(topBrandShare * 1.5));
+  const consolidationScore = brandCount < 5 ? 90 : brandCount < 10 ? 70 : brandCount < 20 ? 50 : brandCount < 30 ? 30 : 10;
+  const barrierScore = Math.round(hhiScore * 0.35 + dominanceScore * 0.35 + consolidationScore * 0.3);
+
+  // 4. Risk level determination
+  let riskLevel, riskColor, riskAdvice;
+  if (barrierScore >= 70) {
+    riskLevel = 'HIGH';
+    riskColor = '#ef4444';
+    riskAdvice = 'This market has high entry barriers. Dominant brands may have strong trademark protection. Consider differentiating with unique formulation or targeting underserved sub-niches.';
+  } else if (barrierScore >= 40) {
+    riskLevel = 'MEDIUM';
+    riskColor = '#f59e0b';
+    riskAdvice = 'Moderate competition. Some established brands but room for new entrants. Check trademarks before choosing brand name.';
+  } else {
+    riskLevel = 'LOW';
+    riskColor = '#10b981';
+    riskAdvice = 'Fragmented market with low barriers. Good opportunity for new brands. Few dominant players to worry about.';
+  }
+
+  // 5. Generate search links for manual verification
+  const searchLinks = {
+    usptoTess: `https://tmsearch.uspto.gov/bin/gate.exe?f=searchss&state=4801:1.1.1&p_s_PARA1=${encodeURIComponent(searchTerm)}&p_s_PARA2=&p_s_ParaOperator=AND&p_s_ALL=&BackReference=&p_L=50&p_plural=yes&p_s_ALL=&a_default=search&a_search=Submit+Query`,
+    googlePatents: `https://patents.google.com/?q=${encodeURIComponent(searchTerm + ' supplement')}&oq=${encodeURIComponent(searchTerm)}`,
+    usptoSearch: `https://www.uspto.gov/trademarks/search`,
+    alibabaSearch: `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(searchTerm)}`
+  };
+
+  // 6. Brand landscape analysis
+  const brandLandscape = brandEntries.slice(0, 15).map(([name, data]) => ({
+    name,
+    productCount: data.count,
+    marketShare: Math.round(data.count / totalProducts * 100),
+    estimatedRevenue: data.revenue || 0,
+    potentialTrademark: data.count >= 3 // likely has trademark if 3+ products
+  }));
+
+  // Count "dead zone" opportunities - brands with low share
+  const weakBrands = brandEntries.filter(([, d]) => d.count <= 2);
+  const strongBrands = brandEntries.filter(([, d]) => d.count >= 5);
+
+  res.json({
+    category,
+    categoryName: catName,
+    barrierScore,
+    riskLevel,
+    riskColor,
+    riskAdvice,
+    metrics: {
+      hhi,
+      hhiScore,
+      topBrandShare,
+      dominanceScore,
+      brandCount,
+      consolidationScore,
+      totalProducts,
+      top3Share: Math.round(top3Share)
+    },
+    brandLandscape,
+    opportunities: {
+      weakBrandsCount: weakBrands.length,
+      strongBrandsCount: strongBrands.length,
+      fragmentationRatio: Math.round(weakBrands.length / Math.max(1, brandEntries.length) * 100),
+      isFragmented: weakBrands.length > strongBrands.length * 2
+    },
+    searchLinks,
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`🚀 VitaView Backend running on http://localhost:${PORT}`);
   console.log(`📋 Mode: LIVE (SP-API direct HTTP)`);

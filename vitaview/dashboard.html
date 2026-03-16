@@ -351,6 +351,10 @@ function VitaView() {
   const [painPointData, setPainPointData] = useState(null);
   const [painPointLoading, setPainPointLoading] = useState(false);
   const [painPointCategory, setPainPointCategory] = useState("ashwagandha");
+  // Module 3: Legal Barrier
+  const [legalData, setLegalData] = useState(null);
+  const [legalLoading, setLegalLoading] = useState(false);
+  const [legalCategory, setLegalCategory] = useState("ashwagandha");
 
   useEffect(() => {
     fetch(`${API_BASE}/api/health`)
@@ -1990,7 +1994,8 @@ function VitaView() {
                 ["keywords", "\u{1F50D} Keyword Intelligence"],
                 ["trends", "\u{1F4C8} Trend Analysis"],
                 ["hashtags", "#\uFE0F\u20E3 Hashtag Discovery"],
-                ["longtail", "\u{1F50E} Longtail Keywords"]
+                ["longtail", "\u{1F50E} Longtail Keywords"],
+                ["legalBarrier", "\u{1F6E1}\uFE0F Legal Barrier"]
               ].map(([id, label]) => (
                 <button key={id} onClick={() => setAiDomSubTab(id)} style={{
                   background: aiDomSubTab === id ? "linear-gradient(135deg, #10b981, #3b82f6)" : "#fff",
@@ -2983,6 +2988,153 @@ function VitaView() {
                 {longtailData && Object.keys(longtailData.keywords || {}).length === 0 && (
                   <div style={{ textAlign: "center", padding: 60, color: "#94a3b8" }}>
                     <p>No keywords found. Make sure trends data is loaded first.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* MODULE 3: LEGAL BARRIER SUB-TAB */}
+            {aiDomSubTab === "legalBarrier" && (
+              <div>
+                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 24, marginBottom: 20 }}>
+                  <h3 style={{ fontSize: 17, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>{"\u{1F6E1}\uFE0F"} Entry Barrier &amp; Legal Risk Checker</h3>
+                  <p style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>브랜드 집중도 &amp; HHI 기반 진입 장벽 분석 + USPTO/Google Patents 검색 링크</p>
+
+                  <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                    <select value={legalCategory} onChange={e => setLegalCategory(e.target.value)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid #e2e8f0", fontSize: 13, minWidth: 200 }}>
+                      {CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+                    </select>
+                    <button onClick={() => {
+                      setLegalData(null);
+                      setLegalLoading(true);
+                      fetch(`${API_BASE}/api/legal-barrier?category=${legalCategory}`)
+                        .then(r => r.json()).then(d => { if (!d.error) setLegalData(d); })
+                        .catch(() => {}).finally(() => setLegalLoading(false));
+                    }} style={{ background: "linear-gradient(135deg, #6366f1, #8b5cf6)", color: "#fff", border: "none", borderRadius: 8, padding: "8px 20px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                      {legalLoading ? "Checking..." : "\u{1F50D} Check Barriers"}
+                    </button>
+                  </div>
+                </div>
+
+                {legalLoading && (
+                  <div style={{ textAlign: "center", padding: 60 }}>
+                    <div style={{ width: 40, height: 40, border: "3px solid rgba(99,102,241,0.2)", borderTopColor: "#6366f1", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
+                    <div style={{ color: "#64748b" }}>Analyzing entry barriers...</div>
+                  </div>
+                )}
+
+                {legalData && !legalLoading && (
+                  <div>
+                    {/* Main Barrier Score Card */}
+                    <div style={{ background: "linear-gradient(135deg, #0f172a, #1e293b)", borderRadius: 14, padding: 28, marginBottom: 20, color: "#fff", textAlign: "center" }}>
+                      <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>Entry Barrier Score - {legalData.categoryName}</div>
+                      <div style={{ fontSize: 64, fontWeight: 800, color: legalData.riskColor, marginBottom: 8 }}>{legalData.barrierScore}</div>
+                      <div style={{ display: "inline-block", background: legalData.riskColor, color: "#fff", padding: "6px 20px", borderRadius: 20, fontSize: 14, fontWeight: 700, marginBottom: 12 }}>
+                        {legalData.riskLevel} RISK
+                      </div>
+                      <div style={{ fontSize: 13, color: "#cbd5e1", maxWidth: 500, margin: "0 auto", lineHeight: 1.5 }}>{legalData.riskAdvice}</div>
+                    </div>
+
+                    {/* Metrics Grid */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, marginBottom: 20 }}>
+                      {[
+                        { label: "HHI Index", value: legalData.metrics?.hhi?.toLocaleString(), desc: legalData.metrics?.hhi > 2500 ? "Highly Concentrated" : legalData.metrics?.hhi > 1500 ? "Moderately Concentrated" : "Competitive", color: legalData.metrics?.hhi > 2500 ? "#ef4444" : legalData.metrics?.hhi > 1500 ? "#f59e0b" : "#10b981" },
+                        { label: "Top Brand Share", value: legalData.metrics?.topBrandShare + "%", desc: "Market leader dominance", color: legalData.metrics?.topBrandShare > 40 ? "#ef4444" : "#3b82f6" },
+                        { label: "Top 3 Share", value: legalData.metrics?.top3Share + "%", desc: "Combined top 3 brands", color: legalData.metrics?.top3Share > 60 ? "#ef4444" : "#6366f1" },
+                        { label: "Total Brands", value: legalData.metrics?.brandCount, desc: legalData.metrics?.brandCount > 20 ? "Fragmented (Good!)" : "Concentrated", color: legalData.metrics?.brandCount > 20 ? "#10b981" : "#f59e0b" },
+                        { label: "Total Products", value: legalData.metrics?.totalProducts, desc: "Products in category", color: "#3b82f6" },
+                        { label: "Fragmentation", value: legalData.opportunities?.fragmentationRatio + "%", desc: legalData.opportunities?.isFragmented ? "Market is fragmented!" : "Some consolidation", color: legalData.opportunities?.isFragmented ? "#10b981" : "#f59e0b" }
+                      ].map((m, i) => (
+                        <div key={i} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16, textAlign: "center" }}>
+                          <div style={{ fontSize: 24, fontWeight: 700, color: m.color }}>{m.value}</div>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", marginTop: 4 }}>{m.label}</div>
+                          <div style={{ fontSize: 10, color: "#94a3b8" }}>{m.desc}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Search Links - Manual Verification */}
+                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 20 }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 14 }}>{"\u{1F50D}"} Manual Verification Links</h4>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
+                        {[
+                          { label: "USPTO Trademark Search", url: legalData.searchLinks?.usptoSearch, icon: "\u{1F3DB}\uFE0F", bg: "#eef2ff", color: "#4338ca", border: "#c7d2fe" },
+                          { label: "Google Patents", url: legalData.searchLinks?.googlePatents, icon: "\u{1F4C4}", bg: "#ecfdf5", color: "#059669", border: "#a7f3d0" },
+                          { label: "Alibaba Sourcing", url: legalData.searchLinks?.alibabaSearch, icon: "\u{1F6D2}", bg: "#fff7ed", color: "#ea580c", border: "#fed7aa" }
+                        ].map((link, i) => (
+                          <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" style={{ display: "block", background: link.bg, border: `1px solid ${link.border}`, borderRadius: 10, padding: 14, textDecoration: "none", textAlign: "center" }}>
+                            <div style={{ fontSize: 24, marginBottom: 6 }}>{link.icon}</div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: link.color }}>{link.label}</div>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Brand Landscape Table */}
+                    {legalData.brandLandscape?.length > 0 && (
+                      <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 20 }}>
+                        <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 14 }}>Brand Landscape (Top 15)</h4>
+                        <div style={{ maxHeight: 400, overflowY: "auto" }}>
+                          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                            <thead>
+                              <tr style={{ background: "#f8fafc", position: "sticky", top: 0 }}>
+                                <th style={{ padding: "8px 10px", textAlign: "left", color: "#64748b" }}>#</th>
+                                <th style={{ padding: "8px 10px", textAlign: "left", color: "#64748b" }}>Brand</th>
+                                <th style={{ padding: "8px 10px", textAlign: "center", color: "#64748b" }}>Products</th>
+                                <th style={{ padding: "8px 10px", textAlign: "center", color: "#64748b" }}>Market Share</th>
+                                <th style={{ padding: "8px 10px", textAlign: "center", color: "#64748b" }}>TM Risk</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {legalData.brandLandscape.map((b, i) => (
+                                <tr key={i} style={{ borderBottom: "1px solid #f1f5f9", background: b.potentialTrademark ? "#fef2f2" : "transparent" }}>
+                                  <td style={{ padding: "8px 10px", color: "#94a3b8" }}>{i + 1}</td>
+                                  <td style={{ padding: "8px 10px", fontWeight: 600, color: "#0f172a" }}>{b.name}</td>
+                                  <td style={{ padding: "8px 10px", textAlign: "center" }}>{b.productCount}</td>
+                                  <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                                      <div style={{ width: 50, height: 5, background: "#f1f5f9", borderRadius: 3, overflow: "hidden" }}>
+                                        <div style={{ width: `${b.marketShare}%`, height: "100%", background: b.marketShare >= 20 ? "#ef4444" : b.marketShare >= 10 ? "#f59e0b" : "#10b981", borderRadius: 3 }} />
+                                      </div>
+                                      <span style={{ fontSize: 11 }}>{b.marketShare}%</span>
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: "8px 10px", textAlign: "center" }}>
+                                    {b.potentialTrademark ? (
+                                      <span style={{ background: "#fef2f2", color: "#dc2626", padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 600 }}>Likely TM</span>
+                                    ) : (
+                                      <span style={{ background: "#ecfdf5", color: "#059669", padding: "2px 8px", borderRadius: 10, fontSize: 10, fontWeight: 600 }}>Low Risk</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Opportunity Summary */}
+                    <div style={{ background: legalData.opportunities?.isFragmented ? "#ecfdf5" : "#fef2f2", border: `1px solid ${legalData.opportunities?.isFragmented ? "#a7f3d0" : "#fecaca"}`, borderRadius: 14, padding: 20 }}>
+                      <h4 style={{ fontSize: 14, fontWeight: 700, color: legalData.opportunities?.isFragmented ? "#059669" : "#dc2626", marginBottom: 10 }}>
+                        {legalData.opportunities?.isFragmented ? "\u2705 Market Opportunity" : "\u26A0\uFE0F Caution Required"}
+                      </h4>
+                      <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.6 }}>
+                        {legalData.opportunities?.isFragmented ? (
+                          <div>
+                            <strong>{legalData.opportunities.weakBrandsCount}</strong> weak brands (1-2 products) vs <strong>{legalData.opportunities.strongBrandsCount}</strong> strong brands (5+ products).
+                            This fragmented market has room for a new player to establish dominance.
+                            <br/>Recommendation: Target the {legalData.opportunities.weakBrandsCount} weak brand positions with a superior product.
+                          </div>
+                        ) : (
+                          <div>
+                            <strong>{legalData.opportunities.strongBrandsCount}</strong> strong brands dominate this market.
+                            High trademark density suggests existing IP protection.
+                            <br/>Recommendation: Differentiate with unique formulation, target under-served sub-niches, and verify trademarks before brand naming.
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
