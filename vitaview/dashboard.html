@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VitaView - Amazon Market Intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  @keyframes scrollTags { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #f1f5f9; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  body { background: #f8fafc; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const API_BASE = window.location.hostname === "localhost" ? "http://localhost:3001" : "";
+
+const CATEGORIES = [
+  { id: "vitamins", name: "Vitamins", icon: "\u{1F48A}" },
+  { id: "protein", name: "Protein", icon: "\u{1F4AA}" },
+  { id: "omega", name: "Omega", icon: "\u{1F41F}" },
+  { id: "probiotics", name: "Probiotics", icon: "\u{1F9A0}" },
+  { id: "collagen", name: "Collagen", icon: "\u2728" },
+  { id: "magnesium", name: "Magnesium", icon: "\u26A1" },
+  { id: "vitaminD", name: "Vitamin D", icon: "\u2600\uFE0F" },
+  { id: "vitaminC", name: "Vitamin C", icon: "\u{1F34B}" },
+  { id: "zinc", name: "Zinc", icon: "\u{1F6E1}\uFE0F" },
+  { id: "iron", name: "Iron", icon: "\u{1FA78}" },
+  { id: "calcium", name: "Calcium", icon: "\u{1F9B4}" },
+  { id: "biotin", name: "Biotin", icon: "\u{1F487}" },
+  { id: "melatonin", name: "Melatonin", icon: "\u{1F319}" },
+  { id: "ashwagandha", name: "Ashwagandha", icon: "\u{1F33F}" },
+  { id: "creatine", name: "Creatine", icon: "\u{1F3CB}\uFE0F" },
+  { id: "turmeric", name: "Turmeric", icon: "\u{1F7E1}" },
+  { id: "elderberry", name: "Elderberry", icon: "\u{1FAD0}" },
+  { id: "fiber", name: "Fiber", icon: "\u{1F33E}" },
+  { id: "multivitamin", name: "Multivitamin", icon: "\u{1F48E}" },
+  { id: "bcaa", name: "BCAA", icon: "\u{1F525}" },
+  { id: "glutamine", name: "Glutamine", icon: "\u{1F9EC}" },
+  { id: "coq10", name: "CoQ10", icon: "\u2764\uFE0F" },
+  { id: "vitaminB", name: "Vitamin B", icon: "\u{1F7E2}" },
+  { id: "vitaminE", name: "Vitamin E", icon: "\u{1F331}" },
+  { id: "vitaminK", name: "Vitamin K", icon: "\u{1F49A}" },
+  { id: "potassium", name: "Potassium", icon: "\u{1F34C}" },
+  { id: "selenium", name: "Selenium", icon: "\u{1F30D}" },
+  { id: "manganese", name: "Manganese", icon: "\u2699\uFE0F" },
+  { id: "lysine", name: "Lysine", icon: "\u{1F9EA}" },
+  { id: "glucosamine", name: "Glucosamine", icon: "\u{1F9B5}" },
+  { id: "spirulina", name: "Spirulina", icon: "\u{1F33F}" },
+  { id: "chlorella", name: "Chlorella", icon: "\u{1F343}" },
+  { id: "echinacea", name: "Echinacea", icon: "\u{1F33B}" },
+  { id: "ginseng", name: "Ginseng", icon: "\u{1F33F}" },
+  { id: "garlic", name: "Garlic", icon: "\u{1F9C4}" },
+  { id: "greenTea", name: "Green Tea", icon: "\u{1F375}" },
+  { id: "appleCiderVinegar", name: "Apple Cider Vinegar", icon: "\u{1F34F}" },
+  { id: "maca", name: "Maca", icon: "\u{1F30B}" },
+  { id: "saw_palmetto", name: "Saw Palmetto", icon: "\u{1F334}" },
+  { id: "milk_thistle", name: "Milk Thistle", icon: "\u{1F33C}" },
+  { id: "rhodiola", name: "Rhodiola", icon: "\u{1F3D4}\uFE0F" },
+  { id: "valerian", name: "Valerian", icon: "\u{1F30C}" },
+  { id: "fenugreek", name: "Fenugreek", icon: "\u{1F33F}" },
+  { id: "black_seed_oil", name: "Black Seed Oil", icon: "\u{1F311}" },
+  { id: "quercetin", name: "Quercetin", icon: "\u{1F34E}" },
+  { id: "resveratrol", name: "Resveratrol", icon: "\u{1F347}" },
+  { id: "lions_mane", name: "Lion's Mane", icon: "\u{1F981}" },
+  { id: "reishi", name: "Reishi", icon: "\u{1F344}" },
+  { id: "berberine", name: "Berberine", icon: "\u{1F7E1}" },
+  { id: "digestive_enzymes", name: "Digestive Enzymes", icon: "\u{1F9EC}" },
+  { id: "lutein", name: "Lutein", icon: "\u{1F441}\uFE0F" },
+  { id: "astaxanthin", name: "Astaxanthin", icon: "\u{1F534}" },
+  { id: "dhea", name: "DHEA", icon: "\u{1F9EA}" },
+  { id: "five_htp", name: "5-HTP", icon: "\u{1F9E0}" },
+  { id: "l_theanine", name: "L-Theanine", icon: "\u{1F375}" },
+  { id: "l_carnitine", name: "L-Carnitine", icon: "\u{1F525}" },
+  { id: "alpha_lipoic_acid", name: "Alpha Lipoic Acid", icon: "\u{1F9EC}" },
+  { id: "nac", name: "NAC", icon: "\u{1F48A}" },
+  { id: "dim", name: "DIM", icon: "\u{1F33F}" },
+  { id: "tribulus", name: "Tribulus", icon: "\u{1F4AA}" },
+  { id: "tongkat_ali", name: "Tongkat Ali", icon: "\u{1F33F}" },
+  { id: "shilajit", name: "Shilajit", icon: "\u26F0\uFE0F" },
+  { id: "cordyceps", name: "Cordyceps", icon: "\u{1F344}" },
+  { id: "chaga", name: "Chaga", icon: "\u{1F344}" },
+  { id: "turkey_tail", name: "Turkey Tail", icon: "\u{1F344}" },
+  { id: "moringa", name: "Moringa", icon: "\u{1F33F}" },
+  { id: "sea_moss", name: "Sea Moss", icon: "\u{1F30A}" },
+  { id: "olive_leaf", name: "Olive Leaf", icon: "\u{1F343}" },
+  { id: "oregano_oil", name: "Oregano Oil", icon: "\u{1F33F}" },
+  { id: "vitamin_a", name: "Vitamin A", icon: "\u{1F7E0}" },
+  { id: "folate", name: "Folate", icon: "\u{1F476}" },
+  { id: "chromium", name: "Chromium", icon: "\u2699\uFE0F" },
+  { id: "iodine", name: "Iodine", icon: "\u{1F9C2}" },
+  { id: "boron", name: "Boron", icon: "\u{1F48E}" },
+  { id: "copper", name: "Copper", icon: "\u{1FA99}" },
+  { id: "inositol", name: "Inositol", icon: "\u{1F9E0}" },
+  { id: "pqq", name: "PQQ", icon: "\u26A1" },
+  { id: "nmn", name: "NMN", icon: "\u23F3" },
+  { id: "hyaluronic_acid", name: "Hyaluronic Acid", icon: "\u{1F4A7}" },
+  { id: "keratin", name: "Keratin", icon: "\u{1F487}" },
+  { id: "msm", name: "MSM", icon: "\u{1F9B5}" },
+  { id: "chondroitin", name: "Chondroitin", icon: "\u{1F9B4}" },
+  { id: "bromelain", name: "Bromelain", icon: "\u{1F34D}" },
+  { id: "psyllium_husk", name: "Psyllium Husk", icon: "\u{1F33E}" },
+  { id: "bovine_colostrum", name: "Bovine Colostrum", icon: "\u{1F404}" },
+  { id: "beta_alanine", name: "Beta Alanine", icon: "\u{1F3CB}\uFE0F" },
+  { id: "citrulline", name: "Citrulline", icon: "\u{1F349}" },
+  { id: "electrolytes", name: "Electrolytes", icon: "\u26A1" },
+  { id: "whey_protein", name: "Whey Protein", icon: "\u{1F95B}" },
+  { id: "casein", name: "Casein", icon: "\u{1F95B}" },
+  { id: "pea_protein", name: "Pea Protein", icon: "\u{1F33F}" },
+  { id: "hemp_protein", name: "Hemp Protein", icon: "\u{1F33F}" },
+  { id: "fish_oil", name: "Fish Oil", icon: "\u{1F41F}" },
+  { id: "krill_oil", name: "Krill Oil", icon: "\u{1F990}" },
+  { id: "evening_primrose", name: "Evening Primrose", icon: "\u{1F33B}" },
+  { id: "black_cohosh", name: "Black Cohosh", icon: "\u{1F33F}" },
+  { id: "st_johns_wort", name: "St. John's Wort", icon: "\u2600\uFE0F" },
+  { id: "bilberry", name: "Bilberry", icon: "\u{1FAD0}" },
+];
+
+const ALL_BRANDS = ["Nature's Bounty", "NOW Foods", "Garden of Life", "Optimum Nutrition", "Vital Proteins",
+  "Sports Research", "Jarrow Formulas", "Solgar", "Nordic Naturals", "MusclePharm",
+  "Thorne", "Life Extension", "Doctor's Best", "Nutricost", "BulkSupplements",
+  "Nature Made", "Centrum", "GNC", "Cellucor", "Dymatize"];
+
+const FORMULAS = ["Daily Support", "Advanced Formula", "Ultra Strength", "Pro Complex", "Essential Blend",
+  "Maximum Potency", "High Absorption", "Extra Strength", "Premium Grade", "Clinical Strength",
+  "Organic Natural", "Pure Extract", "Triple Action", "Time Release", "Fast Acting"];
+
+const BULLET_POINTS = [
+  "Made with premium, high-quality ingredients sourced from trusted suppliers worldwide",
+  "Third-party tested for purity and potency - GMP certified facility",
+  "Easy-to-swallow capsules with no artificial colors, flavors, or preservatives",
+  "Supports overall health and wellness as part of a balanced diet",
+  "Manufactured in the USA in an FDA-registered facility",
+];
+
+// Generate SP-API format items for a category
+function generateCategoryItems(cat, count) {
+  const items = [];
+  const shuffled = [...ALL_BRANDS].sort(() => Math.random() - 0.5);
+  for (let i = 0; i < count; i++) {
+    const brand = shuffled[i % shuffled.length];
+    const formula = FORMULAS[i % FORMULAS.length];
+    const sizes = ['60', '90', '120', '180', '240'];
+    const size = sizes[Math.floor(Math.random() * sizes.length)];
+    const price = +(8 + Math.random() * 52).toFixed(2);
+    const rank = 50 + Math.floor(Math.random() * 80000);
+    items.push({
+      asin: `B0${cat.id.toUpperCase().slice(0,3)}${String(i).padStart(5,'0')}`,
+      summaries: [{ itemName: `${brand} ${cat.name} ${formula} - ${size} Count` }],
+      attributes: {
+        brand: [{ value: brand }],
+        list_price: [{ value: { amount: String(price) } }],
+        bullet_point: BULLET_POINTS.map(b => ({ value: b })),
+      },
+      salesRanks: [{ ranks: [{ rank }] }],
+      images: [{ images: [{ link: `https://placehold.co/300x300/1e293b/6ee7b7?text=${encodeURIComponent(cat.icon)}` }] }],
+    });
+  }
+  return items;
+}
+
+// Demo data generator for trends
+function generateDemoData() {
+  const categories = {};
+  CATEGORIES.forEach((cat, ci) => {
+    const items = generateCategoryItems(cat, 15);
+    const prices = items.map(p => parseFloat(p.attributes.list_price[0].value.amount));
+    const ranks = items.map(p => p.salesRanks[0].ranks[0].rank);
+    const brandData = {};
+    items.forEach(p => {
+      const brand = p.attributes.brand[0].value;
+      const pr = parseFloat(p.attributes.list_price[0].value.amount);
+      if (!brandData[brand]) brandData[brand] = { count: 0, revenue: 0 };
+      brandData[brand].count += 1;
+      brandData[brand].revenue += pr;
+    });
+    categories[cat.id] = {
+      totalProducts: 50 + Math.floor(Math.random() * 200),
+      itemCount: items.length,
+      avgPrice: +(prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2),
+      minPrice: +Math.min(...prices).toFixed(2),
+      maxPrice: +Math.max(...prices).toFixed(2),
+      avgRank: Math.round(ranks.reduce((a, b) => a + b, 0) / ranks.length),
+      brands: brandData,
+      topProducts: items.map(p => ({
+        asin: p.asin,
+        title: p.summaries[0].itemName,
+        brand: p.attributes.brand[0].value,
+        price: parseFloat(p.attributes.list_price[0].value.amount),
+        rank: p.salesRanks[0].ranks[0].rank,
+        image: p.images[0].images[0].link,
+      })).sort((a, b) => a.rank - b.rank).slice(0, 100),
+      priceDistribution: {
+        under10: prices.filter(p => p < 10).length,
+        '10to20': prices.filter(p => p >= 10 && p < 20).length,
+        '20to30': prices.filter(p => p >= 20 && p < 30).length,
+        '30to50': prices.filter(p => p >= 30 && p < 50).length,
+        over50: prices.filter(p => p >= 50).length,
+      }
+    };
+  });
+  return { categories, timestamp: new Date().toISOString() };
+}
+
+// Cache for demo browse data per category
+const demoBrowseCache = {};
+
+// Form (제형) extraction from product title
+const FORM_PATTERNS = [
+  { form: "Gummy", pattern: /gumm(y|ies)/i },
+  { form: "Capsule", pattern: /capsule/i },
+  { form: "Softgel", pattern: /soft\s?gel/i },
+  { form: "Tablet", pattern: /tablet/i },
+  { form: "Powder", pattern: /powder/i },
+  { form: "Liquid", pattern: /liquid|drops?|tincture|syrup/i },
+  { form: "Chewable", pattern: /chewable/i },
+  { form: "Lozenge", pattern: /lozenge/i },
+  { form: "Spray", pattern: /spray/i },
+  { form: "Patch", pattern: /patch/i },
+  { form: "Oil", pattern: /\boil\b/i },
+  { form: "Cream", pattern: /cream|topical|ointment/i },
+];
+
+function extractForm(title) {
+  if (!title) return "Other";
+  for (const { form, pattern } of FORM_PATTERNS) {
+    if (pattern.test(title)) return form;
+  }
+  return "Capsule"; // default assumption for supplements
+}
+
+// Key ingredient extraction from title
+const INGREDIENT_PATTERNS = [
+  /vitamin\s?[a-k]\d*/i, /omega[\s-]?\d/i, /magnesium/i, /zinc/i, /iron/i, /calcium/i,
+  /biotin/i, /collagen/i, /turmeric|curcumin/i, /probiotics?/i, /ashwagandha/i,
+  /melatonin/i, /creatine/i, /protein/i, /fiber/i, /elderberry/i, /coq10/i,
+  /glucosamine/i, /berberine/i, /lion'?s?\s?mane/i, /reishi/i, /cordyceps/i,
+  /peptide/i, /colostrum/i, /hyaluronic/i, /keratin/i, /msm/i, /nmn/i, /nad\+?/i,
+  /sea\s?moss/i, /shilajit/i, /tongkat\s?ali/i, /maca/i, /ginseng/i,
+];
+
+function extractIngredients(title) {
+  if (!title) return [];
+  const found = [];
+  for (const pattern of INGREDIENT_PATTERNS) {
+    const match = title.match(pattern);
+    if (match) found.push(match[0]);
+  }
+  return found;
+}
+
+// Trend hashtags
+const TREND_HASHTAGS = [
+  "#Magnesium", "#GutHealth", "#Fiber", "#SeaMoss", "#NMN", "#AntiAging",
+  "#Collagen", "#Probiotics", "#Ashwagandha", "#LionsMane", "#Mushroom",
+  "#Peptides", "#Electrolytes", "#ProteinPowder", "#Gummy", "#Shilajit",
+  "#TongkatAli", "#NAC", "#Berberine", "#GLP1", "#WeightLoss",
+  "#Colostrum", "#Creatine", "#VitaminD3", "#Omega3", "#Turmeric",
+  "#5HTP", "#LTheanine", "#Adaptogens", "#Nootropics", "#Keto",
+  "#PlantBased", "#Vegan", "#OrganicSupplements", "#CleanLabel",
+];
+
+function CategoryLoadingSpinner() {
+  const [idx, setIdx] = useState(0);
+  const [fade, setFade] = useState(true);
+  useEffect(() => {
+    const t = setInterval(() => {
+      setFade(false);
+      setTimeout(() => {
+        setIdx(i => (i + 1) % CATEGORIES.length);
+        setFade(true);
+      }, 200);
+    }, 800);
+    return () => clearInterval(t);
+  }, []);
+  const cat = CATEGORIES[idx];
+  return (
+    <div style={{ textAlign: "center", padding: 60 }}>
+      <div style={{ fontSize: 64, marginBottom: 12, transition: "opacity 0.2s ease, transform 0.3s ease", opacity: fade ? 1 : 0, transform: fade ? "scale(1) translateY(0)" : "scale(0.7) translateY(10px)" }}>{cat?.icon}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a", marginBottom: 16, minHeight: 24, transition: "opacity 0.2s ease", opacity: fade ? 1 : 0 }}>{cat?.name}</div>
+      <div style={{ width: 36, height: 36, border: "3px solid rgba(16,185,129,0.2)", borderTopColor: "#10b981", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 12px" }} />
+      <div style={{ color: "#64748b", fontSize: 14 }}>Analyzing all categories from Amazon SP-API...</div>
+      <div style={{ color: "#94a3b8", fontSize: 12, marginTop: 6 }}>{idx + 1} / {CATEGORIES.length} categories</div>
+      <div style={{ width: 240, height: 4, background: "#f1f5f9", borderRadius: 2, margin: "14px auto 0", overflow: "hidden" }}>
+        <div style={{ width: `${((idx + 1) / CATEGORIES.length) * 100}%`, height: "100%", background: "linear-gradient(90deg, #10b981, #3b82f6)", borderRadius: 2, transition: "width 0.5s ease" }} />
+      </div>
+    </div>
+  );
+}
+
+function VitaView() {
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeCategory, setActiveCategory] = useState("vitamins");
+  const [products, setProducts] = useState([]);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [apiStatus, setApiStatus] = useState(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [stats, setStats] = useState({ total: 0, brands: 0, avgRank: 0 });
+  const [trends, setTrends] = useState(null);
+  const [trendsLoading, setTrendsLoading] = useState(false);
+  const [expandedCompetition, setExpandedCompetition] = useState(null);
+  const [keywordFilter, setKeywordFilter] = useState("");
+  const [top100CatFilters, setTop100CatFilters] = useState([]);
+  const [top100CatSearch, setTop100CatSearch] = useState("");
+  const [catDetailProducts, setCatDetailProducts] = useState([]);
+  const [catDetailLoading, setCatDetailLoading] = useState(false);
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/health`)
+      .then(r => r.json())
+      .then(setApiStatus)
+      .catch(() => setApiStatus({ status: "ok", mode: "demo" }));
+  }, []);
+
+  const [isLive, setIsLive] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+
+  // Auto-refresh every 30 minutes
+  useEffect(() => {
+    const REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
+    const interval = setInterval(() => {
+      console.log("Auto-refresh: fetching latest data...");
+      loadTrends();
+      if (activeTab === "browse") loadCategory(activeCategory);
+    }, REFRESH_INTERVAL);
+    return () => clearInterval(interval);
+  }, [activeTab, activeCategory]);
+
+  useEffect(() => {
+    if (activeTab === "dashboard" && !trends) loadTrends();
+    if (activeTab === "browse") loadCategory(activeCategory);
+  }, [activeTab, activeCategory]);
+
+  // Fetch category detail products when single category selected in Top 100 filter
+  useEffect(() => {
+    if (top100CatFilters.length === 1) {
+      const catId = top100CatFilters[0];
+      setCatDetailLoading(true);
+      setCatDetailProducts([]);
+      fetch(`${API_BASE}/api/products/${catId}`)
+        .then(r => r.json())
+        .then(data => {
+          const items = (data.items || []).map(p => ({
+            asin: p.asin,
+            title: p.summaries?.[0]?.itemName || 'Unknown',
+            brand: p.attributes?.brand?.[0]?.value || 'Unknown',
+            price: (() => { const lp = p.attributes?.list_price?.[0]; const pr = (typeof lp?.value === 'number' ? lp.value : lp?.value?.amount) || p.attributes?.price?.[0]?.value; return pr ? parseFloat(pr) : null; })(),
+            rank: (() => { const sr = p.salesRanks?.[0]; return sr?.classificationRanks?.[0]?.rank || sr?.displayGroupRanks?.[0]?.rank || sr?.ranks?.[0]?.rank || null; })(),
+            image: p.images?.[0]?.images?.[0]?.link || null,
+            category: catId,
+          })).filter(p => p.rank).sort((a, b) => a.rank - b.rank).slice(0, 100);
+          setCatDetailProducts(items);
+        })
+        .catch(() => setCatDetailProducts([]))
+        .finally(() => setCatDetailLoading(false));
+    } else {
+      setCatDetailProducts([]);
+      setCatDetailLoading(false);
+    }
+  }, [top100CatFilters]);
+
+  const loadTrends = async (forceRefresh = false) => {
+    setTrendsLoading(true);
+    try {
+      const r = await fetch(`${API_BASE}/api/trends${forceRefresh ? '?refresh=true' : ''}`);
+      const data = await r.json();
+      if (data.categories && Object.keys(data.categories).length > 0) {
+        setTrends(data);
+        setIsLive(true);
+      } else {
+        setTrends(generateDemoData());
+        setApiStatus({ status: "ok", mode: "demo" });
+      }
+    } catch (e) {
+      setTrends(generateDemoData());
+      setApiStatus({ status: "ok", mode: "demo" });
+    }
+    setLastUpdated(new Date());
+    setTrendsLoading(false);
+  };
+
+  const loadCategory = async (catId) => {
+    setLoading(true);
+    setProducts([]);
+    try {
+      const r = await fetch(`${API_BASE}/api/products/${catId}`);
+      const data = await r.json();
+      const items = data.items || [];
+      setProducts(items);
+      const brands = new Set(items.map(p => getBrand(p.attributes)));
+      const ranks = items.map(p => getRank(p.salesRanks)).filter(Boolean);
+      setStats({ total: data.numberOfResults || items.length, brands: brands.size, avgRank: ranks.length ? Math.round(ranks.reduce((a, b) => a + b, 0) / ranks.length) : 0 });
+    } catch (e) {
+      // Fallback demo
+      const cat = CATEGORIES.find(c => c.id === catId);
+      if (cat) {
+        if (!demoBrowseCache[catId]) demoBrowseCache[catId] = generateCategoryItems(cat, 20);
+        const items = demoBrowseCache[catId];
+        setProducts(items);
+        const brands = new Set(items.map(p => getBrand(p.attributes)));
+        const ranks = items.map(p => getRank(p.salesRanks)).filter(Boolean);
+        setStats({ total: items.length, brands: brands.size, avgRank: ranks.length ? Math.round(ranks.reduce((a, b) => a + b, 0) / ranks.length) : 0 });
+      }
+    }
+    setLoading(false);
+  };
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setLoading(true);
+    setSearchResults([]);
+    try {
+      const r = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(searchQuery)}`);
+      const data = await r.json();
+      setSearchResults(data.items || []);
+    } catch (e) {
+      // Demo search: find matching items across categories
+      const q = searchQuery.toLowerCase();
+      const matched = [];
+      CATEGORIES.forEach(cat => {
+        if (!demoBrowseCache[cat.id]) demoBrowseCache[cat.id] = generateCategoryItems(cat, 20);
+        demoBrowseCache[cat.id].forEach(item => {
+          const title = item.summaries[0].itemName.toLowerCase();
+          const brand = item.attributes.brand[0].value.toLowerCase();
+          if (title.includes(q) || brand.includes(q) || cat.name.toLowerCase().includes(q)) {
+            matched.push(item);
+          }
+        });
+      });
+      setSearchResults(matched.slice(0, 20));
+    }
+    setLoading(false);
+  };
+
+  const formatPrice = (attrs) => {
+    const lp = attrs?.list_price?.[0];
+    const price = (typeof lp?.value === 'number' ? lp.value : lp?.value?.amount) || attrs?.price?.[0]?.value;
+    return price ? `$${parseFloat(price).toFixed(2)}` : "N/A";
+  };
+  const getBrand = (attrs) => attrs?.brand?.[0]?.value || "Unknown Brand";
+  const getTitle = (summaries) => summaries?.[0]?.itemName || "Unknown Product";
+  const getRank = (salesRanks) => {
+    const sr = salesRanks?.[0];
+    return sr?.classificationRanks?.[0]?.rank || sr?.displayGroupRanks?.[0]?.rank || sr?.ranks?.[0]?.rank || null;
+  };
+  const getImage = (images) => images?.[0]?.images?.[0]?.link || null;
+
+  // Estimate daily sales from BSR (Health & Household category formula)
+  const estimateDailySales = (rank) => {
+    if (!rank || rank <= 0) return null;
+    // Approximate formula for Health & Household on Amazon US
+    if (rank <= 5) return Math.round(300 + (5 - rank) * 100);
+    if (rank <= 50) return Math.round(200 * Math.pow(rank / 5, -0.6));
+    if (rank <= 500) return Math.round(80 * Math.pow(rank / 50, -0.5));
+    if (rank <= 5000) return Math.round(25 * Math.pow(rank / 500, -0.45));
+    if (rank <= 50000) return Math.round(8 * Math.pow(rank / 5000, -0.4));
+    return Math.max(1, Math.round(3 * Math.pow(rank / 50000, -0.35)));
+  };
+
+  const ProductCard = ({ product, onClick }) => {
+    const title = getTitle(product.summaries);
+    const brand = getBrand(product.attributes);
+    const rank = getRank(product.salesRanks);
+    const image = getImage(product.images);
+    const price = formatPrice(product.attributes);
+    return (
+      <div onClick={() => onClick(product)} style={{
+        background: "#fff", border: "1px solid #e2e8f0",
+        borderRadius: 12, padding: 16, cursor: "pointer", transition: "all 0.2s",
+        display: "flex", flexDirection: "column", gap: 10, boxShadow: "0 1px 3px rgba(0,0,0,0.05)"
+      }}
+        onMouseEnter={e => { e.currentTarget.style.background = "#f8fafc"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)"; }}
+        onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.05)"; }}
+      >
+        {image && (
+          <div style={{ width: "100%", height: 140, borderRadius: 8, overflow: "hidden", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <img src={image} alt={title} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+          </div>
+        )}
+        <div>
+          <div style={{ fontSize: 11, color: "#10b981", fontWeight: 700, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>{brand}</div>
+          <div style={{ fontSize: 13, color: "#1e293b", lineHeight: 1.4, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{title}</div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "auto" }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: "#0f172a" }}>{price}</span>
+          {rank && <span style={{ fontSize: 11, color: "#64748b", background: "#f1f5f9", padding: "2px 8px", borderRadius: 10 }}>#{rank.toLocaleString()}</span>}
+        </div>
+        <div style={{ fontSize: 11, color: "#94a3b8" }}>ASIN: {product.asin}</div>
+      </div>
+    );
+  };
+
+  const ProductModal = ({ product, onClose }) => {
+    if (!product) return null;
+    const title = getTitle(product.summaries);
+    const brand = getBrand(product.attributes);
+    const image = getImage(product.images);
+    const price = formatPrice(product.attributes);
+    const rank = getRank(product.salesRanks);
+    const bullets = product.attributes?.bullet_point?.slice(0, 5) || [];
+    const form = extractForm(title);
+    return (
+      <div onClick={onClose} style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000,
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 24
+      }}>
+        <div onClick={e => e.stopPropagation()} style={{
+          background: "#fff", border: "1px solid #e2e8f0",
+          borderRadius: 20, padding: 32, maxWidth: 600, width: "100%", maxHeight: "80vh", overflowY: "auto", boxShadow: "0 25px 50px rgba(0,0,0,0.15)"
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ fontSize: 11, color: "#10b981", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>{brand}</div>
+              <span style={{ fontSize: 10, background: "#f1f5f9", color: "#64748b", padding: "2px 8px", borderRadius: 10 }}>{form}</span>
+            </div>
+            <button onClick={onClose} style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 20 }}>{"\u2715"}</button>
+          </div>
+          {image && (
+            <div style={{ width: "100%", height: 220, borderRadius: 12, overflow: "hidden", background: "#f8fafc", marginBottom: 20, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <img src={image} alt={title} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+            </div>
+          )}
+          <h2 style={{ color: "#0f172a", fontSize: 18, lineHeight: 1.5, marginBottom: 16 }}>{title}</h2>
+          <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
+            <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 10, padding: "10px 16px", flex: 1, textAlign: "center" }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: "#059669" }}>{price}</div>
+              <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>List Price</div>
+            </div>
+            {rank && (
+              <div style={{ background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: 10, padding: "10px 16px", flex: 1, textAlign: "center" }}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: "#4f46e5" }}>#{rank.toLocaleString()}</div>
+                <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Sales Rank</div>
+              </div>
+            )}
+            <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "10px 16px", flex: 1, textAlign: "center" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#d97706" }}>{product.asin}</div>
+              <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>ASIN</div>
+            </div>
+          </div>
+          {bullets.length > 0 && (
+            <div>
+              <div style={{ fontSize: 12, color: "#64748b", fontWeight: 700, marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 }}>Key Features</div>
+              {bullets.map((b, i) => (
+                <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8 }}>
+                  <span style={{ color: "#10b981", flexShrink: 0 }}>{"\u25B8"}</span>
+                  <span style={{ fontSize: 13, color: "#334155", lineHeight: 1.5 }}>{b.value}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <a href={`https://www.amazon.com/dp/${product.asin}`} target="_blank" rel="noreferrer"
+            style={{ display: "block", marginTop: 20, background: "#ff9900", color: "#fff", fontWeight: 700, padding: "12px 20px", borderRadius: 10, textAlign: "center", textDecoration: "none", fontSize: 14 }}>
+            View on Amazon {"\u2192"}
+          </a>
+        </div>
+      </div>
+    );
+  };
+
+  const StatusBadge = () => (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 6,
+      background: apiStatus?.mode === "live" ? "#ecfdf5" : "#fffbeb",
+      border: `1px solid ${apiStatus?.mode === "live" ? "#a7f3d0" : "#fde68a"}`,
+      borderRadius: 20, padding: "4px 12px", fontSize: 12, fontWeight: 600,
+      color: apiStatus?.mode === "live" ? "#059669" : "#d97706"
+    }}>
+      <div style={{
+        width: 6, height: 6, borderRadius: "50%",
+        background: apiStatus?.mode === "live" ? "#059669" : "#d97706",
+        animation: "pulse 2s infinite"
+      }} />
+      {apiStatus?.mode === "live" ? "LIVE" : apiStatus?.mode?.toUpperCase() || "CONNECTING..."}
+      {lastUpdated && (
+        <span style={{ fontSize: 10, opacity: 0.7, marginLeft: 4 }}>
+          {lastUpdated.toLocaleTimeString()}
+        </span>
+      )}
+    </div>
+  );
+
+  // Countdown to next refresh
+  const [nextRefreshIn, setNextRefreshIn] = useState(30 * 60);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNextRefreshIn(prev => {
+        if (prev <= 1) return 30 * 60;
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => { setNextRefreshIn(30 * 60); }, [lastUpdated]);
+
+  // Compute form analysis from all products
+  const computeFormAnalysis = (catEntries) => {
+    const formCounts = {};
+    const formRevenue = {};
+    catEntries.forEach(([catId, c]) => {
+      (c.topProducts || []).forEach(p => {
+        const form = extractForm(p.title);
+        if (!formCounts[form]) { formCounts[form] = 0; formRevenue[form] = 0; }
+        formCounts[form]++;
+        const dailySales = estimateDailySales(p.rank) || 0;
+        formRevenue[form] += (p.price || 0) * dailySales * 30;
+      });
+    });
+    return Object.entries(formCounts)
+      .map(([form, count]) => ({ form, count, revenue: formRevenue[form] || 0 }))
+      .sort((a, b) => b.count - a.count);
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#1e293b", fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+      {/* Header */}
+      <div style={{ borderBottom: "1px solid #e2e8f0", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, background: "rgba(255,255,255,0.95)", backdropFilter: "blur(20px)", zIndex: 100 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 36, height: 36, background: "linear-gradient(135deg, #10b981, #3b82f6)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{"\u{1F33F}"}</div>
+          <div>
+            <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: 20, fontWeight: 800, color: "#0f172a", letterSpacing: -0.5 }}>VitaView</div>
+            <div style={{ fontSize: 11, color: "#94a3b8", letterSpacing: 2, textTransform: "uppercase" }}>Amazon Market Intelligence</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button onClick={() => { setTrends(null); setTimeout(() => loadTrends(true), 100); }} disabled={trendsLoading} style={{
+            background: "linear-gradient(135deg, #10b981, #3b82f6)", border: "none", borderRadius: 8,
+            padding: "7px 14px", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 12,
+            opacity: trendsLoading ? 0.5 : 1
+          }}>{trendsLoading ? "..." : "\u{1F504} Refresh"}</button>
+          <StatusBadge />
+        </div>
+      </div>
+
+      {/* Nav */}
+      <div style={{ padding: "0 32px", borderBottom: "1px solid #e2e8f0", display: "flex", gap: 4, background: "#fff" }}>
+        {[["dashboard", "\u{1F4CA} Dashboard"], ["browse", "\u{1F50D} Browse & Search"]].map(([id, label]) => (
+          <button key={id} onClick={() => setActiveTab(id)} style={{
+            background: "none", border: "none", cursor: "pointer", padding: "14px 16px",
+            fontSize: 13, fontWeight: 600, color: activeTab === id ? "#10b981" : "#64748b",
+            borderBottom: `2px solid ${activeTab === id ? "#10b981" : "transparent"}`,
+            transition: "all 0.2s"
+          }}>{label}</button>
+        ))}
+      </div>
+
+      <div style={{ padding: 32 }}>
+        {/* DASHBOARD TAB */}
+        {activeTab === "dashboard" && (
+          <div>
+            <div style={{ marginBottom: 24 }}>
+              <h1 style={{ fontSize: 28, fontWeight: 700, color: "#0f172a", marginBottom: 8 }}>Trend Analysis Dashboard</h1>
+              <p style={{ color: "#64748b" }}>Amazon US Dietary Supplement Market Intelligence</p>
+            </div>
+
+            {/* Keyword Filter removed - now integrated into Top 100 category filter */}
+
+            {trendsLoading && !trends ? <CategoryLoadingSpinner />
+            : trends ? (() => {
+              const cats = trends.categories || {};
+              let catEntries = Object.entries(cats);
+              // Apply keyword filter
+              if (keywordFilter.trim()) {
+                const kw = keywordFilter.toLowerCase();
+                catEntries = catEntries.filter(([catId, c]) => {
+                  const cat = CATEGORIES.find(ct => ct.id === catId);
+                  if (cat?.name.toLowerCase().includes(kw) || catId.toLowerCase().includes(kw)) return true;
+                  return (c.topProducts || []).some(p => p.title?.toLowerCase().includes(kw) || p.brand?.toLowerCase().includes(kw));
+                });
+              }
+              const totalProducts = catEntries.reduce((sum, [, c]) => sum + c.totalProducts, 0);
+              const allBrands = new Set();
+              catEntries.forEach(([, c]) => Object.keys(c.brands).forEach(b => allBrands.add(b)));
+              const overallAvgPrice = catEntries.length ? +(catEntries.reduce((sum, [, c]) => sum + c.avgPrice, 0) / catEntries.length).toFixed(2) : 0;
+              const topAll = catEntries.flatMap(([catId, c]) => c.topProducts.map(p => ({ ...p, category: catId }))).sort((a, b) => a.rank - b.rank).slice(0, 100);
+              const brandRevenues = {};
+              catEntries.forEach(([, c]) => Object.entries(c.brands).forEach(([b, data]) => {
+                if (!brandRevenues[b]) brandRevenues[b] = { count: 0, revenue: 0 };
+                brandRevenues[b].count += data.count;
+                brandRevenues[b].revenue += data.revenue;
+              }));
+              const topBrands = Object.entries(brandRevenues).sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 10);
+              const formAnalysis = computeFormAnalysis(catEntries);
+              const totalDist = { under10: 0, '10to20': 0, '20to30': 0, '30to50': 0, over50: 0 };
+              catEntries.forEach(([, c]) => { Object.entries(c.priceDistribution).forEach(([k, v]) => { totalDist[k] += v; }); });
+              const maxDist = Math.max(...Object.values(totalDist), 1);
+              const COLORS = ["#10b981", "#6366f1", "#f59e0b", "#ec4899", "#0ea5e9", "#f97316", "#8b5cf6", "#14b8a6"];
+
+              // --- NPD Insights computations ---
+              const maxRev = Math.max(...catEntries.map(([,c]) => c.estimatedMonthlyRevenue || 0), 1);
+              const maxSpread = Math.max(...catEntries.map(([,c]) => c.priceSpread || 0), 1);
+              const scoredCats = catEntries.map(([catId, c]) => {
+                const demandScore = c.avgRank > 0 ? Math.max(0, 100 - Math.log10(c.avgRank) * 20) : 0;
+                const compScore = c.hhi ? Math.max(0, 100 - (c.hhi / 100)) : 50;
+                const priceScore = maxSpread > 0 ? ((c.priceSpread || 0) / maxSpread) * 100 : 0;
+                const revenueScore = maxRev > 0 ? ((c.estimatedMonthlyRevenue || 0) / maxRev) * 100 : 0;
+                const opportunity = Math.round(demandScore * 0.3 + compScore * 0.25 + priceScore * 0.2 + revenueScore * 0.25);
+                return { catId, c, opportunity };
+              });
+              const npdCategories = [...scoredCats].sort((a, b) => b.opportunity - a.opportunity).slice(0, 3);
+              const hotCategories = [...catEntries].sort((a, b) => (b[1].avgDailySales || 0) - (a[1].avgDailySales || 0)).slice(0, 3);
+
+              // Product card helper for recommendation sections
+              const MiniProductCard = ({ p, badge, badgeColor }) => {
+                const cat = CATEGORIES.find(ct => ct.id === p.category);
+                const est = estimateDailySales(p.rank);
+                return (
+                  <div onClick={() => setSelectedProduct({
+                    asin: p.asin, summaries: [{ itemName: p.title }],
+                    attributes: { brand: [{ value: p.brand }], ...(p.price ? { list_price: [{ value: p.price }] } : {}) },
+                    salesRanks: p.rank ? [{ ranks: [{ rank: p.rank }] }] : [],
+                    images: p.image ? [{ images: [{ link: p.image }] }] : [],
+                  })} style={{ display: "flex", gap: 12, padding: 12, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, cursor: "pointer", transition: "all 0.2s", minWidth: 0 }}
+                    onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)"}
+                    onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
+                    {p.image ? (
+                      <div style={{ width: 56, height: 56, borderRadius: 8, overflow: "hidden", background: "#f8fafc", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <img src={p.image} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                      </div>
+                    ) : (
+                      <div style={{ width: 56, height: 56, borderRadius: 8, background: "#f1f5f9", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>{cat?.icon || "\u{1F4E6}"}</div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: "#0f172a", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title}</div>
+                      <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>{p.brand}</div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "center" }}>
+                        {p.price && <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>${p.price.toFixed(2)}</span>}
+                        <span style={{ fontSize: 11, color: "#10b981", fontWeight: 600 }}>#{p.rank?.toLocaleString()}</span>
+                        {est && <span style={{ fontSize: 10, color: "#2563eb", background: "#eff6ff", padding: "1px 6px", borderRadius: 8 }}>~{est}/day</span>}
+                        {badge && <span style={{ fontSize: 10, color: badgeColor || "#6366f1", background: `${badgeColor || "#6366f1"}15`, padding: "1px 6px", borderRadius: 8, fontWeight: 600 }}>{badge}</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              };
+
+              return (
+                <div>
+                  {/* NPD Insight Cards - Simplified Vertical Layout */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 36 }}>
+                    {/* Best Sellers Top 3 */}
+                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "14px 18px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                        <span style={{ fontSize: 16 }}>{"\u{1F3C6}"}</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>Best Sellers Top 3</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                        {topAll.slice(0, 3).map((p, i) => (
+                          <div key={p.asin} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0", flex: "1 1 200px", minWidth: 0, cursor: "pointer" }} onClick={() => setSelectedProduct(p)}>
+                            {p.image && <img src={p.image} alt="" style={{ width: 36, height: 36, objectFit: "contain", borderRadius: 4 }} />}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{["1st","2nd","3rd"][i]} {p.title}</div>
+                              <div style={{ fontSize: 11, color: "#64748b" }}>{p.price ? `$${p.price.toFixed(2)}` : ""} {p.rank ? `#${p.rank.toLocaleString()}` : ""}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* NPD Opportunity Top 3 */}
+                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "14px 18px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                        <span style={{ fontSize: 16 }}>{"\u{1F4A1}"}</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>NPD Opportunity Top 3</span>
+                        <span style={{ fontSize: 11, color: "#64748b" }}>Low competition + high demand</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                        {npdCategories.map(({ catId, c, opportunity }, i) => {
+                          const cat = CATEGORIES.find(ct => ct.id === catId);
+                          const hhiLabel = (c.hhi || 0) < 1500 ? "Low" : (c.hhi || 0) < 2500 ? "Mid" : "High";
+                          return (
+                            <div key={catId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", background: i === 0 ? "#f0fdf4" : "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0", flex: "1 1 200px", minWidth: 0 }}>
+                              <span style={{ fontSize: 22 }}>{cat?.icon}</span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>{cat?.name || catId}</div>
+                                <div style={{ fontSize: 11, color: "#64748b" }}>Score {opportunity} · HHI {hhiLabel} · ~{c.avgDailySales || 0}/day</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Hot Categories Top 3 */}
+                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, padding: "14px 18px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                        <span style={{ fontSize: 16 }}>{"\u{1F525}"}</span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>Hot Right Now</span>
+                        <span style={{ fontSize: 11, color: "#64748b" }}>Highest avg daily sales</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                        {hotCategories.map(([catId, c], i) => {
+                          const cat = CATEGORIES.find(ct => ct.id === catId);
+                          return (
+                            <div key={catId} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", background: i === 0 ? "#fff7ed" : "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0", flex: "1 1 200px", minWidth: 0 }}>
+                              <span style={{ fontSize: 22 }}>{cat?.icon}</span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: "#0f172a" }}>{cat?.name || catId}</div>
+                                <div style={{ fontSize: 11, color: "#64748b" }}>~{c.avgDailySales || 0}/day · ${(c.estimatedMonthlyRevenue || 0).toLocaleString()}/mo</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Market Stats Bar */}
+                  <div style={{ display: "flex", gap: 16, marginBottom: 36, flexWrap: "wrap" }}>
+                    {[
+                      { label: "Total Products", value: totalProducts.toLocaleString(), color: "#10b981" },
+                      { label: "Brands", value: allBrands.size.toLocaleString(), color: "#6366f1" },
+                      { label: "Avg Price", value: `$${overallAvgPrice}`, color: "#f59e0b" },
+                      { label: "Categories", value: catEntries.length, color: "#ec4899" },
+                    ].map((s, i) => (
+                      <div key={i} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "10px 16px", display: "flex", alignItems: "center", gap: 10, boxShadow: "0 1px 2px rgba(0,0,0,0.03)" }}>
+                        <span style={{ fontSize: 16, fontWeight: 700, color: s.color }}>{s.value}</span>
+                        <span style={{ fontSize: 11, color: "#94a3b8" }}>{s.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* ═══════════ SECTION A: Market Overview ═══════════ */}
+                  <div style={{ marginBottom: 16, padding: "12px 0", borderBottom: "2px solid #10b981" }}>
+                    <h2 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a" }}>Section A: Market Overview</h2>
+                    <p style={{ fontSize: 12, color: "#64748b" }}>Category products, avg price, brand market share at a glance</p>
+                  </div>
+
+                  {/* Category Filter for Top 100 - Checkbox Style */}
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "16px 20px", marginBottom: 16, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", whiteSpace: "nowrap" }}>Category Filter</span>
+                      <input value={top100CatSearch} onChange={e => setTop100CatSearch(e.target.value)}
+                        placeholder="Search category..."
+                        style={{ flex: 1, maxWidth: 220, background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 12px", fontSize: 12, color: "#1e293b", outline: "none" }} />
+                      {top100CatFilters.length > 0 && (
+                        <span style={{ fontSize: 11, color: "#059669", fontWeight: 600 }}>{top100CatFilters.length} selected</span>
+                      )}
+                      {top100CatFilters.length > 0 && (
+                        <button onClick={() => { setTop100CatFilters([]); setTop100CatSearch(""); }} style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 8, padding: "5px 12px", cursor: "pointer", fontSize: 11, color: "#64748b", fontWeight: 600 }}>Reset</button>
+                      )}
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", maxHeight: 120, overflowY: "auto" }}>
+                      {CATEGORIES
+                        .filter(cat => !top100CatSearch || cat.name.toLowerCase().includes(top100CatSearch.toLowerCase()))
+                        .filter(cat => catEntries.some(([id]) => id === cat.id))
+                        .map(cat => {
+                          const isChecked = top100CatFilters.includes(cat.id);
+                          return (
+                            <label key={cat.id} onClick={() => {
+                              setTop100CatFilters(prev => isChecked ? prev.filter(id => id !== cat.id) : [...prev, cat.id]);
+                            }} style={{
+                              display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", cursor: "pointer", fontSize: 11, fontWeight: 600, borderRadius: 16, userSelect: "none",
+                              background: isChecked ? "#ecfdf5" : "#fff",
+                              border: `1px solid ${isChecked ? "#a7f3d0" : "#e2e8f0"}`,
+                              color: isChecked ? "#059669" : "#64748b"
+                            }}>
+                              <span style={{ width: 14, height: 14, borderRadius: 3, border: `1.5px solid ${isChecked ? "#10b981" : "#cbd5e1"}`, background: isChecked ? "#10b981" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                {isChecked && <span style={{ color: "#fff", fontSize: 10, lineHeight: 1 }}>{"\u2713"}</span>}
+                              </span>
+                              {cat.icon} {cat.name}
+                            </label>
+                          );
+                        })}
+                    </div>
+                  </div>
+
+                  {/* Top 100 Products */}
+                  {(() => {
+                    let filteredTop;
+                    if (top100CatFilters.length === 0) {
+                      filteredTop = topAll;
+                    } else if (top100CatFilters.length === 1) {
+                      // Single category: use API-fetched detail products only
+                      filteredTop = catDetailLoading ? [] : catDetailProducts;
+                    } else {
+                      filteredTop = catEntries
+                          .filter(([catId]) => top100CatFilters.includes(catId))
+                          .flatMap(([catId, c]) => (c.topProducts || []).map(p => ({ ...p, category: catId })))
+                          .sort((a, b) => a.rank - b.rank)
+                          .slice(0, 100);
+                    }
+                    const filterLabel = top100CatFilters.length === 0 ? "Top 100 Products by Sales Rank"
+                      : top100CatFilters.length === 1 ? (() => { const sc = CATEGORIES.find(c => c.id === top100CatFilters[0]); return `${sc?.icon} ${sc?.name} - Top Products`; })()
+                      : `${top100CatFilters.length} Categories Selected - Top Products`;
+                    return (
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 24, marginBottom: 36, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                      <h3 style={{ fontSize: 17, fontWeight: 700, color: "#0f172a" }}>
+                        {filterLabel}
+                      </h3>
+                      <span style={{ fontSize: 12, color: "#64748b" }}>{filteredTop.length} products</span>
+                    </div>
+                    <div style={{ maxHeight: 600, overflowY: "auto", borderRadius: 10, paddingRight: 4 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {catDetailLoading && <div style={{ textAlign: "center", padding: 40 }}><div style={{ width: 32, height: 32, border: "3px solid rgba(16,185,129,0.2)", borderTopColor: "#10b981", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 12px" }} /><div style={{ color: "#64748b", fontSize: 13 }}>Loading category products...</div></div>}
+                        {!catDetailLoading && filteredTop.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#94a3b8" }}>No products in this category</div>}
+                        {filteredTop.map((p, i) => {
+                          const cat = CATEGORIES.find(ct => ct.id === p.category);
+                          return (
+                            <div key={p.asin} onClick={() => setSelectedProduct({
+                              asin: p.asin, summaries: [{ itemName: p.title }],
+                              attributes: { brand: [{ value: p.brand }], ...(p.price ? { list_price: [{ value: p.price }] } : {}) },
+                              salesRanks: p.rank ? [{ ranks: [{ rank: p.rank }] }] : [],
+                              images: p.image ? [{ images: [{ link: p.image }] }] : [],
+                            })} style={{
+                              display: "flex", alignItems: "center", gap: 16, padding: "12px 16px",
+                              background: i < 3 ? `rgba(${i === 0 ? "245,158,11" : i === 1 ? "148,163,184" : "180,83,9"},0.08)` : "#fff",
+                              border: "1px solid #f1f5f9", borderRadius: 10, cursor: "pointer", transition: "all 0.2s",
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
+                            onMouseLeave={e => e.currentTarget.style.background = i < 3 ? `rgba(${i === 0 ? "245,158,11" : i === 1 ? "148,163,184" : "180,83,9"},0.08)` : "#fff"}>
+                              <div style={{ width: 36, height: 36, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 700, flexShrink: 0,
+                                background: i === 0 ? "#fef3c7" : i === 1 ? "#f1f5f9" : i === 2 ? "#fed7aa" : "#f8fafc",
+                                color: i === 0 ? "#d97706" : i === 1 ? "#64748b" : i === 2 ? "#c2410c" : "#94a3b8"
+                              }}>{i + 1}</div>
+                              {p.image ? (
+                                <div style={{ width: 64, height: 64, borderRadius: 8, overflow: "hidden", background: "#f8fafc", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                  <img src={p.image} alt={p.title} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                                </div>
+                              ) : (
+                                <div style={{ width: 64, height: 64, borderRadius: 8, background: "#f1f5f9", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>{cat?.icon || "\u{1F4E6}"}</div>
+                              )}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 15, color: "#0f172a", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.title}</div>
+                                <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>{p.brand} &middot; {cat?.icon} {cat?.name}</div>
+                              </div>
+                              <div style={{ textAlign: "right", flexShrink: 0, display: "flex", alignItems: "center", gap: 14 }}>
+                                {(() => { const est = estimateDailySales(p.rank); return est ? (
+                                  <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "6px 10px", textAlign: "center", minWidth: 60 }}>
+                                    <div style={{ fontSize: 14, fontWeight: 700, color: "#2563eb" }}>~{est}</div>
+                                    <div style={{ fontSize: 10, color: "#64748b" }}>sales/day</div>
+                                  </div>
+                                ) : null; })()}
+                                <div>
+                                  <div style={{ fontSize: 15, fontWeight: 700, color: "#10b981" }}>#{p.rank.toLocaleString()}</div>
+                                  {p.price && <div style={{ fontSize: 13, color: "#64748b", marginTop: 2 }}>${p.price.toFixed(2)}</div>}
+                                </div>
+                                <a href={`https://www.amazon.com/dp/${p.asin}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+                                  style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, borderRadius: 8, background: "#fff7ed", color: "#ea580c", textDecoration: "none", fontSize: 16, flexShrink: 0, border: "1px solid #fed7aa" }}
+                                  title="View on Amazon">{"\u2197"}</a>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                    );
+                  })()}
+
+                  {/* Top Brands + Category Revenue side by side */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 36 }}>
+                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 16 }}>Top Brands</h3>
+                      <div style={{ maxHeight: 400, overflowY: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                          <thead><tr style={{ borderBottom: "1px solid #e2e8f0" }}>
+                            {["#", "Brand", "Products", "Revenue"].map(h => (
+                              <th key={h} style={{ padding: "8px 12px", textAlign: h === "#" ? "center" : "left", color: "#64748b", fontWeight: 600, fontSize: 11, textTransform: "uppercase", position: "sticky", top: 0, background: "#fff" }}>{h}</th>
+                            ))}
+                          </tr></thead>
+                          <tbody>
+                            {topBrands.map(([brand, data], i) => (
+                              <tr key={brand} style={{ borderBottom: "1px solid #f1f5f9" }}
+                                onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
+                                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                                <td style={{ padding: "8px 12px", textAlign: "center", color: i < 3 ? "#d97706" : "#94a3b8", fontWeight: 700, fontSize: 13 }}>{i + 1}</td>
+                                <td style={{ padding: "8px 12px", color: "#0f172a", fontWeight: 500, fontSize: 13 }}>{brand}</td>
+                                <td style={{ padding: "8px 12px", color: "#64748b", fontSize: 13 }}>{data.count}</td>
+                                <td style={{ padding: "8px 12px", color: COLORS[i % COLORS.length], fontWeight: 600, fontSize: 13 }}>${data.revenue.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>Category Revenue Ranking</h3>
+                      <p style={{ fontSize: 11, color: "#64748b", marginBottom: 16 }}>BSR based estimated monthly revenue</p>
+                      <div style={{ maxHeight: 400, overflowY: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                          <thead><tr style={{ borderBottom: "1px solid #e2e8f0" }}>
+                            {["#", "Category", "Monthly Rev", "Sales/Day"].map(h => (
+                              <th key={h} style={{ padding: "8px 10px", textAlign: h === "#" ? "center" : "left", color: "#64748b", fontWeight: 600, fontSize: 11, textTransform: "uppercase", position: "sticky", top: 0, background: "#fff" }}>{h}</th>
+                            ))}
+                          </tr></thead>
+                          <tbody>
+                            {[...catEntries].sort((a, b) => (b[1].estimatedMonthlyRevenue || 0) - (a[1].estimatedMonthlyRevenue || 0)).map(([catId, c], i) => {
+                              const cat = CATEGORIES.find(ct => ct.id === catId);
+                              return (
+                                <tr key={catId} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                                  <td style={{ padding: "8px 10px", textAlign: "center", color: i < 3 ? "#d97706" : "#94a3b8", fontWeight: 700, fontSize: 13 }}>{i + 1}</td>
+                                  <td style={{ padding: "8px 10px", color: "#0f172a", fontSize: 13 }}>{cat?.icon} {cat?.name || catId}</td>
+                                  <td style={{ padding: "8px 10px", color: "#10b981", fontWeight: 600, fontSize: 13 }}>${(c.estimatedMonthlyRevenue || 0).toLocaleString()}</td>
+                                  <td style={{ padding: "8px 10px", color: "#2563eb", fontSize: 13 }}>~{c.avgDailySales || 0}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ═══════════ SECTION B: Product Deep-dive ═══════════ */}
+                  <div style={{ marginBottom: 16, padding: "12px 0", borderBottom: "2px solid #6366f1" }}>
+                    <h2 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a" }}>Section B: Product Deep-dive</h2>
+                    <p style={{ fontSize: 12, color: "#64748b" }}>Form analysis, ingredient pairings, micro-trend insights</p>
+                  </div>
+
+                  {/* Form Analysis */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 36 }}>
+                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>Form Analysis (Dosage Type)</h3>
+                      <p style={{ fontSize: 11, color: "#64748b", marginBottom: 16 }}>Which dosage forms sell best?</p>
+                      <div style={{ maxHeight: 400, overflowY: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                          <thead><tr style={{ borderBottom: "1px solid #e2e8f0" }}>
+                            {["#", "Form", "Products", "Est. Revenue", "Share"].map(h => (
+                              <th key={h} style={{ padding: "8px 10px", textAlign: h === "#" ? "center" : "left", color: "#64748b", fontWeight: 600, fontSize: 11, textTransform: "uppercase", position: "sticky", top: 0, background: "#fff" }}>{h}</th>
+                            ))}
+                          </tr></thead>
+                          <tbody>
+                            {(() => {
+                              const totalFormProducts = formAnalysis.reduce((s, f) => s + f.count, 0);
+                              return formAnalysis.map((f, i) => (
+                                <tr key={f.form} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                                  <td style={{ padding: "8px 10px", textAlign: "center", color: i < 3 ? "#d97706" : "#94a3b8", fontWeight: 700, fontSize: 13 }}>{i + 1}</td>
+                                  <td style={{ padding: "8px 10px", color: "#0f172a", fontWeight: 600, fontSize: 13 }}>{f.form}</td>
+                                  <td style={{ padding: "8px 10px", color: "#64748b", fontSize: 13 }}>{f.count}</td>
+                                  <td style={{ padding: "8px 10px", color: "#10b981", fontWeight: 600, fontSize: 13 }}>${f.revenue.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+                                  <td style={{ padding: "8px 10px" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                      <div style={{ flex: 1, height: 6, background: "#f1f5f9", borderRadius: 3, overflow: "hidden" }}>
+                                        <div style={{ width: `${totalFormProducts > 0 ? (f.count / totalFormProducts) * 100 : 0}%`, height: "100%", background: COLORS[i % COLORS.length], borderRadius: 3 }} />
+                                      </div>
+                                      <span style={{ fontSize: 11, color: "#64748b", minWidth: 35 }}>{totalFormProducts > 0 ? Math.round((f.count / totalFormProducts) * 100) : 0}%</span>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ));
+                            })()}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Products by Category */}
+                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>Products by Category</h3>
+                      <p style={{ fontSize: 11, color: "#64748b", marginBottom: 16 }}>Market saturation indicator</p>
+                      <div style={{ maxHeight: 400, overflowY: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                          <thead><tr style={{ borderBottom: "1px solid #e2e8f0" }}>
+                            {["#", "Category", "Products", "Avg Price"].map(h => (
+                              <th key={h} style={{ padding: "8px 10px", textAlign: h === "#" ? "center" : "left", color: "#64748b", fontWeight: 600, fontSize: 11, textTransform: "uppercase", position: "sticky", top: 0, background: "#fff" }}>{h}</th>
+                            ))}
+                          </tr></thead>
+                          <tbody>
+                            {[...catEntries].sort((a, b) => b[1].totalProducts - a[1].totalProducts).map(([catId, c], i) => {
+                              const cat = CATEGORIES.find(ct => ct.id === catId);
+                              return (
+                                <tr key={catId} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                                  <td style={{ padding: "8px 10px", textAlign: "center", color: i < 3 ? "#d97706" : "#94a3b8", fontWeight: 700, fontSize: 13 }}>{i + 1}</td>
+                                  <td style={{ padding: "8px 10px", color: "#0f172a", fontSize: 13 }}>{cat?.icon} {cat?.name || catId}</td>
+                                  <td style={{ padding: "8px 10px", color: COLORS[i % COLORS.length], fontWeight: 600, fontSize: 13 }}>{c.totalProducts.toLocaleString()}</td>
+                                  <td style={{ padding: "8px 10px", color: "#64748b", fontSize: 13 }}>${c.avgPrice}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Price Distribution + Price Range */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 36 }}>
+                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 20 }}>Price Distribution</h3>
+                      <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 160, paddingTop: 10 }}>
+                        {[
+                          { key: "under10", label: "<$10", color: "#10b981" },
+                          { key: "10to20", label: "$10-20", color: "#0ea5e9" },
+                          { key: "20to30", label: "$20-30", color: "#6366f1" },
+                          { key: "30to50", label: "$30-50", color: "#f59e0b" },
+                          { key: "over50", label: "$50+", color: "#ec4899" },
+                        ].map(({ key, label, color }) => (
+                          <div key={key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end" }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color, marginBottom: 6 }}>{totalDist[key]}</div>
+                            <div style={{ width: "100%", background: `${color}22`, borderRadius: "6px 6px 0 0", height: `${Math.max((totalDist[key] / maxDist) * 100, 4)}%`, position: "relative" }}>
+                              <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, ${color}cc, ${color}66)`, borderRadius: "6px 6px 0 0" }} />
+                            </div>
+                            <div style={{ fontSize: 10, color: "#64748b", marginTop: 8, textAlign: "center" }}>{label}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 24, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                      <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 20 }}>Category Price Range</h3>
+                      <div style={{ overflowX: "auto", maxHeight: 300, overflowY: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                          <thead><tr style={{ borderBottom: "1px solid #e2e8f0" }}>
+                            {["Category", "Avg", "Min", "Max", "Rank"].map(h => (
+                              <th key={h} style={{ padding: "8px 10px", textAlign: "left", color: "#64748b", fontWeight: 600, fontSize: 11, textTransform: "uppercase", position: "sticky", top: 0, background: "#fff" }}>{h}</th>
+                            ))}
+                          </tr></thead>
+                          <tbody>
+                            {catEntries.map(([catId, c], i) => {
+                              const cat = CATEGORIES.find(ct => ct.id === catId);
+                              return (
+                                <tr key={catId} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                                  <td style={{ padding: "8px 10px", color: "#0f172a", fontWeight: 600, fontSize: 12 }}>{cat?.icon} {cat?.name || catId}</td>
+                                  <td style={{ padding: "8px 10px", color: COLORS[i % COLORS.length], fontWeight: 600 }}>${c.avgPrice}</td>
+                                  <td style={{ padding: "8px 10px", color: "#10b981" }}>${c.minPrice.toFixed(2)}</td>
+                                  <td style={{ padding: "8px 10px", color: "#ec4899" }}>${c.maxPrice.toFixed(2)}</td>
+                                  <td style={{ padding: "8px 10px", color: "#6366f1" }}>#{c.avgRank.toLocaleString()}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ═══════════ SECTION C: Opportunity Finder ═══════════ */}
+                  <div style={{ marginBottom: 16, padding: "12px 0", borderBottom: "2px solid #f59e0b" }}>
+                    <h2 style={{ fontSize: 20, fontWeight: 700, color: "#0f172a" }}>Section C: Opportunity Finder</h2>
+                    <p style={{ fontSize: 12, color: "#64748b" }}>Gap markets, opportunity scores, trending insights</p>
+                  </div>
+
+                  {/* Competition Analysis with expandable products */}
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 24, marginBottom: 36, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                    <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>Competition Analysis</h3>
+                    <p style={{ fontSize: 11, color: "#64748b", marginBottom: 16 }}>Brand concentration & market entry difficulty - click a row to see products</p>
+                    <div style={{ maxHeight: 500, overflowY: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead><tr style={{ borderBottom: "1px solid #e2e8f0" }}>
+                          {["", "Category", "Brands", "HHI", "Top Brand", "Share"].map(h => (
+                            <th key={h} style={{ padding: "8px 10px", textAlign: "left", color: "#64748b", fontWeight: 600, fontSize: 11, textTransform: "uppercase", position: "sticky", top: 0, background: "#fff" }}>{h}</th>
+                          ))}
+                        </tr></thead>
+                        <tbody>
+                          {[...catEntries].filter(([, c]) => c.brandCount > 0 || Object.keys(c.brands || {}).length > 0).sort((a, b) => (a[1].hhi || 0) - (b[1].hhi || 0)).map(([catId, c]) => {
+                            const cat = CATEGORIES.find(ct => ct.id === catId);
+                            const hhiVal = c.hhi || 0;
+                            const hhiColor = hhiVal < 1500 ? "#10b981" : hhiVal < 2500 ? "#f59e0b" : "#ef4444";
+                            const hhiLabel = hhiVal < 1500 ? "Low" : hhiVal < 2500 ? "Mid" : "High";
+                            const isExpanded = expandedCompetition === catId;
+                            return React.createElement(React.Fragment, { key: catId },
+                              <tr style={{ borderBottom: "1px solid #f1f5f9", cursor: "pointer", background: isExpanded ? "#f0fdf4" : "transparent" }}
+                                onClick={() => setExpandedCompetition(isExpanded ? null : catId)}
+                                onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = "#f8fafc"; }}
+                                onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = "transparent"; }}>
+                                <td style={{ padding: "8px 10px", color: "#94a3b8", fontSize: 12 }}>{isExpanded ? "\u25BC" : "\u25B6"}</td>
+                                <td style={{ padding: "8px 10px", color: "#0f172a", fontWeight: 600, fontSize: 12 }}>{cat?.icon} {cat?.name || catId}</td>
+                                <td style={{ padding: "8px 10px", color: "#64748b", fontSize: 13 }}>{c.brandCount || Object.keys(c.brands).length}</td>
+                                <td style={{ padding: "8px 10px" }}>
+                                  <span style={{ color: hhiColor, fontWeight: 600, fontSize: 12 }}>{hhiVal.toLocaleString()}</span>
+                                  <span style={{ color: hhiColor, fontSize: 10, marginLeft: 4, opacity: 0.7 }}>({hhiLabel})</span>
+                                </td>
+                                <td style={{ padding: "8px 10px", color: "#0f172a", fontSize: 12 }}>{c.topBrand || 'N/A'}</td>
+                                <td style={{ padding: "8px 10px", color: "#6366f1", fontWeight: 600, fontSize: 13 }}>{c.topBrandShare || 0}%</td>
+                              </tr>,
+                              isExpanded && (c.topProducts || []).slice(0, 10).map((prod, pi) => (
+                                <tr key={`${catId}-${pi}`} style={{ background: "#f0fdf4", borderBottom: "1px solid #e2e8f0" }}>
+                                  <td style={{ padding: "6px 10px" }}></td>
+                                  <td colSpan={3} style={{ padding: "6px 10px", fontSize: 12, color: "#334155" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                      {prod.image && <img src={prod.image} alt="" style={{ width: 28, height: 28, borderRadius: 4, objectFit: "contain", background: "#fff" }} />}
+                                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 300 }}>{prod.title}</span>
+                                    </div>
+                                  </td>
+                                  <td style={{ padding: "6px 10px", fontSize: 12, color: "#64748b" }}>{prod.brand}</td>
+                                  <td style={{ padding: "6px 10px", fontSize: 12 }}>
+                                    <span style={{ color: "#10b981", fontWeight: 600 }}>#{prod.rank?.toLocaleString()}</span>
+                                    {prod.price && <span style={{ color: "#64748b", marginLeft: 8 }}>${prod.price.toFixed(2)}</span>}
+                                  </td>
+                                </tr>
+                              ))
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Market Opportunity Score */}
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 24, marginBottom: 12, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                    <h3 style={{ fontSize: 15, fontWeight: 700, color: "#0f172a", marginBottom: 4 }}>Market Opportunity Score</h3>
+                    <p style={{ fontSize: 11, color: "#64748b", marginBottom: 16 }}>High demand + Low competition + Price room = High opportunity</p>
+                    <div style={{ maxHeight: 400, overflowY: "auto" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <thead><tr style={{ borderBottom: "1px solid #e2e8f0" }}>
+                          {["#", "Category", "Opportunity", "Demand", "Competition", "Price Room", "Revenue"].map(h => (
+                            <th key={h} style={{ padding: "8px 10px", textAlign: h === "#" ? "center" : "left", color: "#64748b", fontWeight: 600, fontSize: 11, textTransform: "uppercase", position: "sticky", top: 0, background: "#fff" }}>{h}</th>
+                          ))}
+                        </tr></thead>
+                        <tbody>
+                          {(() => {
+                            const maxRev = Math.max(...catEntries.map(([,c]) => c.estimatedMonthlyRevenue || 0), 1);
+                            const maxSpread = Math.max(...catEntries.map(([,c]) => c.priceSpread || 0), 1);
+                            const scored = catEntries.map(([catId, c]) => {
+                              const demandScore = c.avgRank > 0 ? Math.max(0, 100 - Math.log10(c.avgRank) * 20) : 0;
+                              const compScore = c.hhi ? Math.max(0, 100 - (c.hhi / 100)) : 50;
+                              const priceScore = maxSpread > 0 ? ((c.priceSpread || 0) / maxSpread) * 100 : 0;
+                              const revenueScore = maxRev > 0 ? ((c.estimatedMonthlyRevenue || 0) / maxRev) * 100 : 0;
+                              const opportunity = Math.round(demandScore * 0.3 + compScore * 0.25 + priceScore * 0.2 + revenueScore * 0.25);
+                              return { catId, c, demandScore: Math.round(demandScore), compScore: Math.round(compScore), priceScore: Math.round(priceScore), revenueScore: Math.round(revenueScore), opportunity };
+                            }).sort((a, b) => b.opportunity - a.opportunity);
+                            return scored.map(({ catId, demandScore, compScore, priceScore, revenueScore, opportunity }, i) => {
+                              const cat = CATEGORIES.find(ct => ct.id === catId);
+                              const oppColor = opportunity >= 70 ? "#10b981" : opportunity >= 50 ? "#f59e0b" : "#ef4444";
+                              return (
+                                <tr key={catId} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                                  <td style={{ padding: "8px 10px", textAlign: "center", color: i < 3 ? "#d97706" : "#94a3b8", fontWeight: 700, fontSize: 13 }}>{i + 1}</td>
+                                  <td style={{ padding: "8px 10px", color: "#0f172a", fontSize: 13 }}>{cat?.icon} {cat?.name || catId}</td>
+                                  <td style={{ padding: "8px 10px" }}>
+                                    <span style={{ background: `${oppColor}18`, border: `1px solid ${oppColor}44`, borderRadius: 6, padding: "3px 8px", color: oppColor, fontWeight: 700, fontSize: 13 }}>{opportunity}</span>
+                                  </td>
+                                  <td style={{ padding: "8px 10px", color: "#0ea5e9", fontSize: 12 }}>{demandScore}</td>
+                                  <td style={{ padding: "8px 10px", color: "#8b5cf6", fontSize: 12 }}>{compScore}</td>
+                                  <td style={{ padding: "8px 10px", color: "#f59e0b", fontSize: 12 }}>{priceScore}</td>
+                                  <td style={{ padding: "8px 10px", color: "#10b981", fontSize: 12 }}>{revenueScore}</td>
+                                </tr>
+                              );
+                            });
+                          })()}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Trend Hashtags Rolling Banner */}
+                  <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "14px 24px", marginBottom: 36, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>Trending Now</span>
+                      <span style={{ fontSize: 11, color: "#64748b" }}>Popular supplement trends & hashtags</span>
+                    </div>
+                    <div style={{ overflow: "hidden", position: "relative" }}>
+                      <div style={{ display: "flex", gap: 12, animation: "scrollTags 30s linear infinite", width: "max-content" }}>
+                        {[...TREND_HASHTAGS, ...TREND_HASHTAGS].map((tag, i) => (
+                          <span key={i} style={{
+                            background: i % 5 === 0 ? "#ecfdf5" : i % 5 === 1 ? "#eff6ff" : i % 5 === 2 ? "#fef3c7" : i % 5 === 3 ? "#fdf2f8" : "#f5f3ff",
+                            color: i % 5 === 0 ? "#059669" : i % 5 === 1 ? "#2563eb" : i % 5 === 2 ? "#d97706" : i % 5 === 3 ? "#db2777" : "#7c3aed",
+                            padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap",
+                            border: `1px solid ${i % 5 === 0 ? "#a7f3d0" : i % 5 === 1 ? "#bfdbfe" : i % 5 === 2 ? "#fde68a" : i % 5 === 3 ? "#fbcfe8" : "#ddd6fe"}`
+                          }}>{tag}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })() : (
+              <div style={{ textAlign: "center", padding: 60, color: "#94a3b8" }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>{"\u{1F4CA}"}</div>
+                <p>Click "Refresh" to load trend analysis</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* BROWSE & SEARCH TAB */}
+        {activeTab === "browse" && (
+          <div>
+            {/* Search bar */}
+            <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+              <input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSearch()}
+                placeholder="Search supplements... (e.g. vitamin c, protein, NOW Foods)"
+                style={{
+                  flex: 1, background: "#fff", border: "1px solid #e2e8f0",
+                  borderRadius: 10, padding: "12px 16px", color: "#1e293b", fontSize: 14, outline: "none"
+                }}
+              />
+              <button onClick={handleSearch} style={{
+                background: "linear-gradient(135deg, #10b981, #3b82f6)", border: "none",
+                borderRadius: 10, padding: "12px 24px", color: "#fff", fontWeight: 700,
+                cursor: "pointer", fontSize: 14
+              }}>Search</button>
+            </div>
+
+            {/* Search Results */}
+            {searchResults.length > 0 && (
+              <div style={{ marginBottom: 28 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                  <h2 style={{ fontSize: 18, fontWeight: 700, color: "#0f172a" }}>Search Results ({searchResults.length})</h2>
+                  <button onClick={() => setSearchResults([])} style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 12px", color: "#64748b", cursor: "pointer", fontSize: 12 }}>Clear</button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+                  {searchResults.map(p => <ProductCard key={p.asin} product={p} onClick={setSelectedProduct} />)}
+                </div>
+                <div style={{ borderBottom: "1px solid #e2e8f0", margin: "28px 0" }} />
+              </div>
+            )}
+
+            {/* Category header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <h1 style={{ fontSize: 24, fontWeight: 700, color: "#0f172a" }}>
+                  {CATEGORIES.find(c => c.id === activeCategory)?.icon} {CATEGORIES.find(c => c.id === activeCategory)?.name}
+                </h1>
+                {stats.total > 0 && <p style={{ color: "#64748b", fontSize: 13, marginTop: 4 }}>{stats.total.toLocaleString()} products &middot; {stats.brands} brands</p>}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 28, flexWrap: "wrap" }}>
+              {CATEGORIES.map(cat => (
+                <button key={cat.id} onClick={() => setActiveCategory(cat.id)} style={{
+                  background: activeCategory === cat.id ? "#ecfdf5" : "#fff",
+                  border: `1px solid ${activeCategory === cat.id ? "#a7f3d0" : "#e2e8f0"}`,
+                  borderRadius: 20, padding: "6px 14px", cursor: "pointer",
+                  fontSize: 12, fontWeight: 600,
+                  color: activeCategory === cat.id ? "#059669" : "#64748b",
+                  transition: "all 0.2s"
+                }}>{cat.icon} {cat.name}</button>
+              ))}
+            </div>
+
+            {loading ? (
+              <div style={{ textAlign: "center", padding: 80 }}>
+                <div style={{ width: 40, height: 40, border: "3px solid rgba(16,185,129,0.2)", borderTopColor: "#10b981", borderRadius: "50%", animation: "spin 1s linear infinite", margin: "0 auto 16px" }} />
+                <div style={{ color: "#64748b" }}>Loading products...</div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 16 }}>
+                {products.map(p => <ProductCard key={p.asin} product={p} onClick={setSelectedProduct} />)}
+                {products.length === 0 && <div style={{ color: "#94a3b8", gridColumn: "1/-1", textAlign: "center", padding: 60 }}>No products found</div>}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<VitaView />);
+</script>
+</body>
+</html>

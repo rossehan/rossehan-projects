@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: vitaview
+    runtime: node
+    rootDir: vitaview
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: SP_API_CLIENT_ID
+        sync: false
+      - key: SP_API_CLIENT_SECRET
+        sync: false
+      - key: SP_API_REFRESH_TOKEN
+        sync: false
+      - key: MARKETPLACE_ID
+        sync: false
