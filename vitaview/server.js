@@ -1843,10 +1843,12 @@ app.get('/api/ai-formulator/auto-recommend', async (req, res) => {
     return res.json({ error: 'GEMINI_API_KEY not set', message: 'Gemini API 키가 필요합니다. .env 파일에 GEMINI_API_KEY=your_key를 추가해주세요.' });
   }
 
-  // User inputs
-  const targetMarket = req.query.targetMarket || '';  // e.g. "sleep", "gut", "beauty"
+  // User inputs (all support comma-separated multi-select)
+  const targetMarket = req.query.targetMarket || '';  // e.g. "sleep,gut,beauty"
+  const targetAudience = req.query.targetAudience || '';  // e.g. "gen_z,athletes,vegan"
+  const considerations = req.query.considerations || '';  // e.g. "high_margin,trending"
   const preferredIngredients = req.query.ingredients || '';  // e.g. "ashwagandha,magnesium"
-  const formType = req.query.formType || '';  // e.g. "gummy", "capsule", "powder"
+  const formType = req.query.formType || '';  // e.g. "gummy,capsule"
   const budget = parseInt(req.query.budget) || 10000;  // initial investment USD
 
   try {
@@ -1900,16 +1902,18 @@ app.get('/api/ai-formulator/auto-recommend', async (req, res) => {
       };
     }).sort((a, b) => b.dominationScore - a.dominationScore);
 
-    // 2. Filter by user's target market if specified
+    // 2. Filter by user's target markets (supports multiple comma-separated)
     let relevantCategories = scored;
-    if (targetMarket && HEALTH_CONCERNS[targetMarket]) {
-      const targetCats = HEALTH_CONCERNS[targetMarket].categories;
-      relevantCategories = scored.filter(s => targetCats.includes(s.catId));
+    const marketKeys = targetMarket ? targetMarket.split(',').filter(k => HEALTH_CONCERNS[k]) : [];
+    if (marketKeys.length > 0) {
+      const allTargetCats = new Set();
+      marketKeys.forEach(k => HEALTH_CONCERNS[k].categories.forEach(c => allTargetCats.add(c)));
+      relevantCategories = scored.filter(s => allTargetCats.has(s.catId));
       if (relevantCategories.length === 0) relevantCategories = scored.slice(0, 10);
     }
 
-    // 3. Build market context (top 8 relevant categories)
-    const topCats = relevantCategories.slice(0, 8);
+    // 3. Build market context (top 10 relevant categories for broader analysis)
+    const topCats = relevantCategories.slice(0, 10);
 
     // 4. Map categories to health concerns
     const categoryConcernMap = {};
@@ -1975,8 +1979,27 @@ app.get('/api/ai-formulator/auto-recommend', async (req, res) => {
 
 IMPORTANT: Always respond in Korean (한국어). Follow the exact JSON schema. Be bold, data-driven, and decisive.`;
 
+    // Audience label map
+    const audienceLabels = {
+      gen_z: 'Gen Z (18-27)', millennial: '밀레니얼 (28-43)', gen_x: 'Gen X (44-59)',
+      boomer: '시니어 (60+)', athletes: '운동선수/헬스', pregnant: '임산부/수유부',
+      kids: '키즈/어린이', vegan: '비건/채식', keto: '키토/저탄고지', busy_pro: '직장인/바쁜 사람'
+    };
+    const considerationLabels = {
+      high_margin: '고마진 우선', low_competition: '경쟁 적은 틈새', trending: '트렌드/성장성',
+      repeat_purchase: '반복구매율', easy_manufacture: '제조 용이성', fda_safe: 'FDA 안전성',
+      brand_story: '브랜드 스토리', subscription: '구독 모델 적합', social_viral: 'SNS 바이럴',
+      patent_possible: '특허/독점 가능', clean_label: '클린라벨/천연', price_sensitive: '가격 경쟁력'
+    };
+
+    const marketLabels = marketKeys.map(k => HEALTH_CONCERNS[k]?.label || k).join(', ');
+    const audienceList = targetAudience ? targetAudience.split(',').map(k => audienceLabels[k] || k).join(', ') : '';
+    const considerationList = considerations ? considerations.split(',').map(k => considerationLabels[k] || k).join(', ') : '';
+
     const userInputSection = `## 사용자 요청:
-- 타겟 시장: ${targetMarket ? (HEALTH_CONCERNS[targetMarket]?.label || targetMarket) : '전체 (사용자 미선택)'}
+- 타겟 시장: ${marketLabels || '전체 (사용자 미선택)'}
+- 타겟 고객층: ${audienceList || '없음 (AI 추천)'}
+- 제품 기획 고려사항: ${considerationList || '없음 (AI 추천)'}
 - 선호 원료: ${preferredIngredients || '없음 (AI 추천)'}
 - 선호 제형: ${formType || '없음 (AI 추천)'}
 - 초기 투자 예산: $${budget.toLocaleString()}`;
@@ -2005,6 +2028,9 @@ ${JSON.stringify(fdaData, null, 2)}
 - 제품2: 가성비 전략 (중가, 대량 판매)
 - 제품3: 틈새 전략 (독특한 배합/제형으로 차별화)
 
+중요: 사용자가 선택한 타겟 고객층과 고려사항을 반드시 반영해서 제품을 설계해.
+${audienceList ? `타겟 고객층(${audienceList})의 니즈, 구매력, 선호도를 고려해.` : ''}
+${considerationList ? `특히 다음 사항을 우선적으로 고려해: ${considerationList}` : ''}
 각 제품에 대해 시장 파이와 ROI를 반드시 계산해서 포함해줘.
 사용자가 선호 원료나 제형을 입력했으면 그것을 반영하되, AI가 더 나은 옵션이 있다고 판단하면 이유와 함께 대안을 제시해.
 
@@ -2089,7 +2115,7 @@ ${JSON.stringify(fdaData, null, 2)}
 
       res.json({
         aiFormulation: aiResponse,
-        userInputs: { targetMarket, preferredIngredients, formType, budget },
+        userInputs: { targetMarket, targetAudience, considerations, preferredIngredients, formType, budget },
         marketData: {
           totalCategories: scored.length,
           relevantCategories: topCats.length,
