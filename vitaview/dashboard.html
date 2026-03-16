@@ -1484,7 +1484,7 @@ function VitaView() {
                   <div>
                     {miYoutube.mode === "demo" && (
                       <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "10px 16px", marginBottom: 16, fontSize: 12, color: "#92400e" }}>
-                        {"\u26A0\uFE0F"} Demo Mode - .env{"\u{C5D0}"} YOUTUBE_API_KEY{"\u{B97C}"} {"\u{CD94\uAC00\uD558\uBA74}"} {"\u{C2E4\uC2DC\uAC04}"} {"\u{B370\uC774\uD130\uB85C}"} {"\u{C804\uD658\uB429\uB2C8\uB2E4}"}
+                        {"\u26A0\uFE0F"} Demo Mode - .env에 YOUTUBE_API_KEY를 추가하면 실시간 데이터로 전환됩니다
                       </div>
                     )}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
@@ -1495,7 +1495,7 @@ function VitaView() {
                     {/* Trending Ingredients from YouTube */}
                     {miYoutube.trendingIngredients?.length > 0 && (
                       <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 20 }}>
-                        <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>YouTube{"\u{C5D0\uC11C}"} {"\u{C5B8\uAE09\uB41C}"} Top {"\u{C131\uBD84}"}  </h4>
+                        <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>YouTube에서 언급된 Top 성분  </h4>
                         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                           {miYoutube.trendingIngredients.map((ing, i) => (
                             <div key={i} style={{ background: `linear-gradient(135deg, ${i < 3 ? "#fef2f2" : "#f8fafc"}, ${i < 3 ? "#fee2e2" : "#f1f5f9"})`, border: `1px solid ${i < 3 ? "#fecaca" : "#e2e8f0"}`, borderRadius: 10, padding: "10px 16px", textAlign: "center" }}>
@@ -1571,7 +1571,7 @@ function VitaView() {
                     {/* Trending Supplements on Reddit */}
                     {miReddit.trendingSupplements?.length > 0 && (
                       <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 20 }}>
-                        <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>Reddit{"\u{C5D0\uC11C}"} {"\u{D654\uC81C\uC778}"} {"\u{C131\uBD84}"}</h4>
+                        <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>Reddit에서 화제인 성분</h4>
                         <div style={{ overflowX: "auto" }}>
                           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                             <thead>
@@ -1623,7 +1623,7 @@ function VitaView() {
               <div>
                 {/* Ingredient selector */}
                 <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: 20, marginBottom: 20 }}>
-                  <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>{"\u{1F50D}"} {"\u{C131\uBD84\uBCC4}"} FDA {"\u{C548\uC804\uC131}"} {"\u{C870\uD68C}"}</h4>
+                  <h4 style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 12 }}>{"\u{1F50D}"} 성분별 FDA 안전성 조회</h4>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {["ashwagandha", "creatine", "berberine", "sea moss", "lions mane", "turmeric", "collagen", "magnesium", "melatonin", "probiotics"].map(ing => (
                       <button key={ing} onClick={() => loadFdaDetail(ing)} style={{
