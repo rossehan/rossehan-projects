@@ -329,50 +329,63 @@ health:[
 {id:'ingredient',name:'기능성 원료 검토/선정',minDays:3,maxDays:10,defaultDays:5,basis:'고시형 원료(95종) 중 선택 시 빠름. 원료 샘플 수급, 함량 비교에 따라 변동',desc:'고시형 원료 선택, 함량 결정, 원료사 견적'},
 {id:'formula',name:'배합 설계 (레시피)',minDays:5,maxDays:14,defaultDays:7,basis:'OEM 업체 연구원 배정 속도, 배합 복잡도(단일 vs 복합), 부형제 종류에 따라 결정',desc:'배합비 설계, 부원료/부형제 선정'},
 {id:'sample',name:'시제품 제작/테스트',minDays:7,maxDays:21,defaultDays:14,basis:'시제품 횟수(1~3회), 맛/안정성 보완 필요 여부, OEM 업체 라인 일정에 따라 결정',desc:'소량 시제품 생산, 관능평가, 안정성 테스트'},
+{id:'nutrition',name:'영양성분 분석',minDays:5,maxDays:14,defaultDays:7,basis:'공인시험기관(한국식품연구원, SGS 등) 의뢰. 9대 영양소(열량/탄수화물/당류/단백질/지방/포화지방/트랜스지방/콜레스테롤/나트륨) 분석',desc:'영양성분 표시를 위한 시험기관 분석 의뢰'},
+{id:'stability',name:'안정성 시험',minDays:14,maxDays:90,defaultDays:30,basis:'가속시험(40도C/75%RH 6개월) 또는 장기보존시험. 유통기한 설정 근거. 가속시험 최소 1개월~, 장기보존은 실제 기간',desc:'유통기한/소비기한 설정을 위한 가속시험 또는 장기보존시험'},
+{id:'standard',name:'기준규격 검사',minDays:5,maxDays:14,defaultDays:7,basis:'성상/기능성분 정량/붕해/미생물(일반세균,대장균군,대장균)/중금속(납,카드뮴,수은,비소) 검사. 공인기관 의뢰 시 7~14일',desc:'건기식 기준규격 적합 여부 확인 (기능성분 함량, 미생물, 중금속)'},
 {id:'design',name:'포장 디자인/인쇄',minDays:5,maxDays:21,defaultDays:14,basis:'디자인 시안 수정 횟수, 인쇄 방식(디지털/옵셋), 포장재 재질 수급 기간에 따라 결정',desc:'법정 표시사항 포함 라벨/포장 디자인, 인쇄'},
 {id:'barcode',name:'바코드 발급',minDays:1,maxDays:7,defaultDays:3,basis:'GS1 Korea 업체코드 보유 시 1일, 신규 신청 시 5~7일',desc:'GS1 Korea 업체코드 신청, GTIN 생성'},
+{id:'ad_review',name:'광고심의 (패키지/광고)',minDays:5,maxDays:14,defaultDays:7,basis:'한국건강기능식품협회 사전심의. 기능성 표현 심의 필수. 심의수수료 발생. 보완 시 추가 소요',desc:'건기식 패키지 표시/광고 문구 사전심의 (한국건강기능식품협회)'},
 {id:'approval',name:'품목제조신고',minDays:5,maxDays:14,defaultDays:10,basis:'식약처 처리기간 + 서류 보완 여부. 서류 완벽하면 5일, 보완 요청 시 14일',desc:'식약처: 제조방법설명서, 시험검사성적서 제출'},
 {id:'production',name:'양산 (GMP 공장)',minDays:5,maxDays:21,defaultDays:10,basis:'생산 수량, OEM 공장 라인 가동 스케줄, 원료 입고 리드타임에 따라 결정',desc:'GMP/HACCP 인증 공장 본생산'},
-{id:'qc',name:'품질검사 및 출하',minDays:3,maxDays:10,defaultDays:5,basis:'검사 항목 수(기능성분, 미생물, 중금속), 외부기관 위탁검사 여부에 따라 결정',desc:'기능성분 함량, 미생물, 중금속 검사 후 출고'},
+{id:'finished_qc',name:'완제품 검사 (출하검사)',minDays:5,maxDays:14,defaultDays:7,basis:'양산 완료 후 출하 전 최종 품질검사. 기준규격 전항목 재검사(기능성분/미생물/중금속/성상). 공인기관 위탁 시 7~14일',desc:'완제품 기준규격 전항목 검사 후 적합 판정 시 출하'},
+{id:'qc',name:'출하 및 입고',minDays:2,maxDays:5,defaultDays:3,basis:'출하검사 적합 후 물류센터/창고 입고 리드타임',desc:'출하검사 통과 후 물류 배송, 창고 입고'},
 ],
 health_individual:[
 {id:'concept',name:'제품 기획/컨셉 수립',minDays:3,maxDays:14,defaultDays:7,basis:'시장조사 범위에 따라 결정',desc:'타겟 소비자, 기능성 방향, 경쟁제품 분석'},
 {id:'ingredient',name:'개별인정형 원료 인정 신청',minDays:60,maxDays:180,defaultDays:120,basis:'식약처 심사: 신규원료 120일, 기능성 추가 60일. 보완요청 시 180일+',desc:'식약처 개별인정 심사 + 임상시험 자료 제출'},
 {id:'formula',name:'배합 설계 (레시피)',minDays:5,maxDays:14,defaultDays:7,basis:'OEM 연구원 배정 및 배합 복잡도에 따라 결정',desc:'OEM 연구원 배합비 설계'},
 {id:'sample',name:'시제품 제작/테스트',minDays:7,maxDays:21,defaultDays:14,basis:'시제품 횟수, 임상결과 반영 보완 여부에 따라 결정',desc:'소량 시제품 생산, 임상시험 결과 반영'},
+{id:'nutrition',name:'영양성분 분석',minDays:5,maxDays:14,defaultDays:7,basis:'공인시험기관 의뢰. 9대 영양소 분석 (열량/탄수화물/당류/단백질/지방/포화지방/트랜스지방/콜레스테롤/나트륨)',desc:'영양성분 표시를 위한 시험기관 분석'},
+{id:'stability',name:'안정성 시험',minDays:14,maxDays:90,defaultDays:30,basis:'가속시험(40도C/75%RH) 또는 장기보존시험. 유통기한 설정 근거',desc:'유통기한 설정을 위한 가속/장기보존시험'},
+{id:'standard',name:'기준규격 검사',minDays:5,maxDays:14,defaultDays:7,basis:'성상/기능성분 정량/붕해/미생물/중금속 검사. 공인기관 의뢰 시 7~14일',desc:'건기식 기준규격 적합 여부 확인'},
 {id:'design',name:'포장 디자인/인쇄',minDays:5,maxDays:21,defaultDays:14,basis:'디자인 수정 횟수, 포장재 수급에 따라 결정',desc:'법정 표시사항 포함 라벨/포장 디자인'},
 {id:'barcode',name:'바코드 발급',minDays:1,maxDays:7,defaultDays:3,basis:'GS1 Korea 업체코드 보유 여부에 따라 결정',desc:'GS1 Korea 업체코드 신청'},
+{id:'ad_review',name:'광고심의 (패키지/광고)',minDays:5,maxDays:14,defaultDays:7,basis:'한국건강기능식품협회 사전심의. 개별인정형은 심의 더 엄격',desc:'건기식 패키지/광고 문구 사전심의'},
 {id:'approval',name:'품목제조신고',minDays:5,maxDays:14,defaultDays:10,basis:'식약처 처리 + 개별인정형 서류 추가 검토',desc:'식약처 제출 + 개별인정형 원료 인정서류'},
 {id:'production',name:'양산 (GMP 공장)',minDays:5,maxDays:21,defaultDays:10,basis:'수량, 공장 라인 일정에 따라 결정',desc:'GMP/HACCP 인증 공장 본생산'},
-{id:'qc',name:'품질검사 및 출하',minDays:3,maxDays:10,defaultDays:5,basis:'검사 항목 수, 외부기관 위탁 여부에 따라 결정',desc:'기능성분 함량 검사 후 출고'},
+{id:'finished_qc',name:'완제품 검사 (출하검사)',minDays:5,maxDays:14,defaultDays:7,basis:'양산 후 기준규격 전항목 재검사. 적합 판정 후 출하 가능',desc:'완제품 기준규격 전항목 검사'},
+{id:'qc',name:'출하 및 입고',minDays:2,maxDays:5,defaultDays:3,basis:'출하검사 적합 후 물류 리드타임',desc:'출하검사 통과 후 물류 배송'},
 ],
 general:[
 {id:'concept',name:'제품 기획/컨셉 수립',minDays:2,maxDays:10,defaultDays:5,basis:'시장조사 범위, 이미 정해진 컨셉 여부에 따라 결정',desc:'제품 유형, 타겟 시장, 맛/형태 결정'},
 {id:'ingredient',name:'레시피 개발/원료 소싱',minDays:5,maxDays:14,defaultDays:7,basis:'원재료 수급 난이도, 수입 원료 여부, 레시피 복잡도에 따라 결정',desc:'원재료 선정, 배합비 설계, 공급업체 확보'},
 {id:'sample',name:'시제품 제작/테스트',minDays:5,maxDays:14,defaultDays:7,basis:'시제품 횟수, 관능평가 보완, 보존성 테스트 기간에 따라 결정',desc:'소량 생산, 관능평가, 보존성 테스트'},
+{id:'nutrition',name:'영양성분 분석',minDays:5,maxDays:10,defaultDays:7,basis:'공인시험기관 의뢰. 9대 영양소 필수 + 1일 영양성분 기준치 대비 % 계산. 2023.7.1부터 신규 품목 의무',desc:'영양성분 표시를 위한 시험기관 분석 의뢰'},
+{id:'stability',name:'안정성/보존성 시험',minDays:7,maxDays:60,defaultDays:14,basis:'소비기한 설정 근거. 가속시험 또는 유사제품 참고. 일반식품은 건기식 대비 간소',desc:'소비기한 설정을 위한 보존성 테스트'},
 {id:'design',name:'포장 디자인/인쇄',minDays:5,maxDays:14,defaultDays:10,basis:'디자인 수정, 인쇄 방식, 포장재 수급에 따라 결정',desc:'식품표시기준 라벨, 포장재 선정'},
 {id:'barcode',name:'바코드 발급',minDays:1,maxDays:5,defaultDays:3,basis:'GS1 Korea 업체코드 보유 여부',desc:'GS1 Korea 바코드 발급'},
 {id:'report',name:'품목제조보고',minDays:1,maxDays:5,defaultDays:2,basis:'관할 시군구청 처리속도, 서류 준비 상태에 따라 결정',desc:'관할 시/군/구청 보고'},
-{id:'production',name:'양산 및 품질검사',minDays:5,maxDays:14,defaultDays:7,basis:'수량, HACCP 공장 라인 일정, 원료 입고에 따라 결정',desc:'HACCP 공장 제조, 자가품질검사'},
-{id:'qc',name:'출하',minDays:1,maxDays:5,defaultDays:2,basis:'포장 완료 여부, 물류 준비 상태에 따라 결정',desc:'포장 완료 후 출고'},
+{id:'production',name:'양산 (HACCP 공장)',minDays:5,maxDays:14,defaultDays:7,basis:'수량, HACCP 공장 라인 일정, 원료 입고에 따라 결정',desc:'HACCP 공장 제조'},
+{id:'self_qc',name:'자가품질검사',minDays:3,maxDays:10,defaultDays:5,basis:'식품위생법 의무. 미생물(세균수/대장균군)/이물/식품첨가물 등 검사. 자체 또는 위탁기관',desc:'법적 의무 자가품질검사 (미생물, 이물, 식품첨가물 등)'},
+{id:'qc',name:'출하 및 입고',minDays:1,maxDays:5,defaultDays:2,basis:'포장 완료 여부, 물류 준비 상태에 따라 결정',desc:'자가품질검사 적합 후 출고'},
 ]};
 
 const checklistData={
 health:{
 phase1:[{title:'타겟 소비자층 정의',desc:'연령, 성별, 건강 고민 등'},{title:'경쟁제품 분석',desc:'시장 내 유사 제품 가격/성분/마케팅 분석'},{title:'기능성 방향 결정',desc:'면역, 피로, 눈건강, 장건강 등'},{title:'제형 결정',desc:'정제, 캡슐, 분말, 젤리, 액상, 스틱 등'},{title:'목표 가격대 설정',desc:'원가율 및 시장가 기반 소비자가 산정'},{title:'브랜드명/제품명 결정',desc:'상표 등록 가능 여부 확인'}],
 phase2:[{title:'기능성 원료 유형 결정',desc:'고시형(95종) vs 개별인정형'},{title:'주원료 선정 및 함량 결정',desc:'일일섭취량 기준 충족 여부 확인'},{title:'부원료/부형제 선정',desc:'맛, 안정성, 제형 적합성 검토'},{title:'원료 공급업체 확보',desc:'원료 규격서, 시험성적서 확보'},{title:'배합비 설계 완료',desc:'OEM 연구원과 협의 최종 배합비 확정'},{title:'원가 계산',desc:'원료비+제조비+포장비 원가 산출'}],
-phase3:[{title:'시제품 제작 의뢰',desc:'OEM 업체에 소량 시제품 요청'},{title:'관능평가 (맛/향/색)',desc:'시제품 맛, 향, 색상, 질감 평가'},{title:'안정성 테스트',desc:'가속시험, 장기보존시험'},{title:'기능성분 함량 분석',desc:'공인 시험기관 분석 의뢰'},{title:'배합 보완/확정',desc:'테스트 결과 반영 최종 배합비 확정'}],
-phase4:[{title:'유통전문판매업 신고',desc:'관할 시군구청 (교육필증 4시간 필요)'},{title:'제조방법설명서 작성',desc:'원료 입고~출하 전 공정 기록'},{title:'시험검사성적서 확보',desc:'기준규격 적합 확인 검사'},{title:'유통기한 설정 사유서',desc:'자체 또는 위탁 검사 근거 자료'},{title:'품목제조신고서 제출',desc:'식약처 온라인 제출'},{title:'품목제조신고 완료',desc:'신고번호 수령 확인'}],
-phase5:[{title:'법정 필수표시사항 확인',desc:'건강기능식품 마크, 기능성분, 섭취주의사항'},{title:'포장 디자인 시안 제작',desc:'표면/이면/측면 디자인'},{title:'표시사항 법적 검토',desc:'기능성 표현 적합성 (질병예방 금지)'},{title:'바코드 발급 (GS1)',desc:'KAN코드 업체코드 신청 후 GTIN 생성'},{title:'포장재 인쇄/제작',desc:'인쇄 교정 확인 후 양산 발주'}],
-phase6:[{title:'OEM 제조 계약서 체결',desc:'위탁생산 계약 조건 확정'},{title:'GMP 공장 양산 개시',desc:'원료 입고, 배합, 성형, 포장'},{title:'품질검사 (QC)',desc:'기능성분, 미생물, 중금속 검사'},{title:'포장 및 라벨링',desc:'최종 포장, 라벨 부착, 박스 포장'},{title:'출하 검사 완료',desc:'최종 출하 전 검사 통과'},{title:'물류 배송 시작',desc:'창고 입고 및 배송 개시'}]
+phase3:[{title:'시제품 제작 의뢰',desc:'OEM 업체에 소량 시제품 요청'},{title:'관능평가 (맛/향/색)',desc:'시제품 맛, 향, 색상, 질감 평가'},{title:'영양성분 분석 의뢰',desc:'공인시험기관에 9대 영양소 분석 의뢰 (열량/탄수화물/당류/단백질/지방 등)'},{title:'기능성분 정량분석',desc:'기능성분 함량 분석 (공인기관: KFRI, SGS, KTR 등)'},{title:'안정성 시험 (가속/장기보존)',desc:'유통기한 설정 근거: 가속시험(40도C/75%RH) 또는 장기보존시험'},{title:'기준규격 검사',desc:'성상/기능성분함량/붕해/미생물(일반세균,대장균군)/중금속(납,카드뮴,수은,비소)'},{title:'배합 보완/확정',desc:'테스트 결과 반영 최종 배합비 확정'}],
+phase4:[{title:'유통전문판매업 신고',desc:'관할 시군구청 (교육필증 4시간 필요)'},{title:'제조방법설명서 작성',desc:'원료 입고~출하 전 공정 기록'},{title:'시험검사성적서 확보',desc:'기준규격 전항목 적합 확인 성적서'},{title:'유통기한 설정 사유서',desc:'안정성 시험 근거 자료 (가속시험 성적서)'},{title:'품목제조신고서 제출',desc:'식약처 온라인 제출'},{title:'품목제조신고 완료',desc:'신고번호 수령 확인'}],
+phase5:[{title:'법정 필수표시사항 확인',desc:'건강기능식품 마크, 기능성분, 섭취주의사항, 영양정보'},{title:'포장 디자인 시안 제작',desc:'표면/이면/측면 디자인'},{title:'표시사항 법적 검토',desc:'기능성 표현 적합성 (질병예방 금지)'},{title:'광고심의 신청',desc:'한국건강기능식품협회 사전심의 (패키지 문구/광고 소재). 심의수수료 발생'},{title:'광고심의 통과/보완',desc:'심의 결과 확인, 부적합 시 수정 후 재심의'},{title:'바코드 발급 (GS1)',desc:'KAN코드 업체코드 신청 후 GTIN 생성'},{title:'포장재 인쇄/제작',desc:'인쇄 교정 확인 후 양산 발주'}],
+phase6:[{title:'OEM 제조 계약서 체결',desc:'위탁생산 계약 조건 확정'},{title:'GMP 공장 양산 개시',desc:'원료 입고, 배합, 성형, 포장'},{title:'완제품 검사 (출하검사)',desc:'기준규격 전항목 재검사: 기능성분 정량/미생물/중금속/성상/붕해'},{title:'포장 및 라벨링',desc:'최종 포장, 라벨 부착, 박스 포장'},{title:'출하 검사 적합 판정',desc:'공인기관 시험성적서 적합 확인 후 출하 승인'},{title:'물류 배송 시작',desc:'창고 입고 및 배송 개시'}]
 },
 general:{
 phase1:[{title:'타겟 소비자층 정의',desc:'연령, 성별, 라이프스타일'},{title:'경쟁제품 분석',desc:'시장 내 유사 제품 분석'},{title:'제품 유형/카테고리 결정',desc:'과자류, 음료, 즉석식품 등'},{title:'맛/향미 방향 결정',desc:'핵심 맛 프로필 설정'},{title:'목표 가격대 설정',desc:'유통채널별 가격 전략'},{title:'브랜드명/제품명 결정',desc:'상표 등록 확인'}],
 phase2:[{title:'주원재료 선정',desc:'핵심 원재료 및 규격 결정'},{title:'부재료/첨가물 선정',desc:'향료, 감미료, 보존료 등'},{title:'원료 공급업체 확보',desc:'원료 공급 안정성 확인'},{title:'배합비 설계',desc:'레시피 개발 및 최적화'},{title:'알레르기 유발물질 확인',desc:'22종 알레르기 유발물질 점검'},{title:'원가 계산',desc:'원료비+제조비+포장비'}],
-phase3:[{title:'시제품 제작',desc:'OEM 업체 소량 시제품'},{title:'관능평가',desc:'맛, 향, 색, 질감 종합 평가'},{title:'보존성/안정성 테스트',desc:'유통기한 설정 근거 마련'},{title:'영양성분 분석',desc:'영양성분 표시용 분석'},{title:'레시피 확정',desc:'최종 배합비 확정'}],
-phase4:[{title:'제조방법설명서 작성',desc:'전 공정 기록'},{title:'소비기한 설정 사유서',desc:'검사 근거 자료 준비'},{title:'영양성분 정보 등록',desc:'2023.7.1부터 의무화'},{title:'품목제조보고',desc:'관할 시군구청 보고'},{title:'자가품질검사 계획',desc:'검사 주기 및 항목 결정'}],
-phase5:[{title:'식품표시기준 확인',desc:'제품명, 식품유형, 영양성분 등'},{title:'포장 디자인 시안',desc:'표면/이면 디자인'},{title:'알레르기 표시 확인',desc:'알레르기 유발 원료 표시'},{title:'바코드 발급',desc:'GS1 Korea KAN코드'},{title:'포장재 인쇄/제작',desc:'교정 확인 후 양산'}],
-phase6:[{title:'OEM 계약서 체결',desc:'위탁생산 계약'},{title:'HACCP 공장 양산',desc:'본생산 개시'},{title:'자가품질검사',desc:'미생물, 이물 등 검사'},{title:'포장/라벨링 완료',desc:'최종 포장'},{title:'출하',desc:'물류 배송 개시'}]
+phase3:[{title:'시제품 제작',desc:'OEM 업체 소량 시제품'},{title:'관능평가',desc:'맛, 향, 색, 질감 종합 평가'},{title:'영양성분 분석 의뢰',desc:'공인시험기관에 9대 영양소 분석 의뢰 (2023.7.1부터 신규품목 의무)'},{title:'보존성/안정성 테스트',desc:'소비기한 설정 근거 마련 (가속시험 또는 유사제품 참고)'},{title:'레시피 확정',desc:'최종 배합비 확정'}],
+phase4:[{title:'제조방법설명서 작성',desc:'전 공정 기록 (원료입고~출하)'},{title:'소비기한 설정 사유서',desc:'안정성 시험 근거 자료'},{title:'영양성분 정보 등록',desc:'식품안전나라 영양성분 DB 등록 (2023.7.1부터 의무)'},{title:'품목제조보고',desc:'관할 시군구청 보고 (생산 후 7일 이내)'},{title:'자가품질검사 계획 수립',desc:'법적 의무: 검사 주기(연1회 이상), 항목(미생물/이물/식품첨가물) 결정'}],
+phase5:[{title:'식품표시기준 확인',desc:'제품명, 식품유형, 영양성분, 알레르기 표시 등'},{title:'포장 디자인 시안',desc:'표면/이면 디자인'},{title:'알레르기 표시 확인',desc:'22종 알레르기 유발물질 표시 확인'},{title:'바코드 발급',desc:'GS1 Korea KAN코드'},{title:'포장재 인쇄/제작',desc:'교정 확인 후 양산'}],
+phase6:[{title:'OEM 계약서 체결',desc:'위탁생산 계약'},{title:'HACCP 공장 양산',desc:'본생산 개시'},{title:'자가품질검사 실시',desc:'법적 의무: 미생물(세균수/대장균군)/이물/식품첨가물 등 검사'},{title:'포장/라벨링 완료',desc:'최종 포장'},{title:'자가품질검사 적합 확인',desc:'시험성적서 적합 판정 확인 후 출하 승인'},{title:'출하 및 물류 배송',desc:'창고 입고 및 배송 개시'}]
 }};
 
 // TAB
