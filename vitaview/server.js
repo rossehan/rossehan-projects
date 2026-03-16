@@ -2014,12 +2014,21 @@ ${JSON.stringify(fdaData, null, 2)}
     });
 
     console.log('🤖 Auto-recommend: calling Gemini with top 5 opportunities...');
+    console.log('🔑 GEMINI_API_KEY:', GEMINI_API_KEY ? `${GEMINI_API_KEY.slice(0,10)}...` : 'NOT SET');
+    console.log('📝 Prompt length:', (systemPrompt + userPrompt).length, 'chars');
+
     const geminiRes = await httpsPost(
       'generativelanguage.googleapis.com',
       `/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-      { 'Content-Type': 'application/json' },
+      { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(geminiBody) },
       geminiBody
     );
+
+    console.log('📡 Gemini response status:', geminiRes.status);
+    console.log('📡 Gemini response keys:', Object.keys(geminiRes.data || {}));
+    if (geminiRes.data?.error) {
+      console.log('❌ Gemini error:', JSON.stringify(geminiRes.data.error));
+    }
 
     if (geminiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
       let aiResponse;
@@ -2046,7 +2055,12 @@ ${JSON.stringify(fdaData, null, 2)}
         timestamp: new Date().toISOString()
       });
     } else {
-      res.json({ error: 'Gemini response error', details: geminiRes.data });
+      console.log('❌ Gemini full response:', JSON.stringify(geminiRes.data).slice(0, 500));
+      res.json({
+        error: 'Gemini response error',
+        message: geminiRes.data?.error?.message || 'Gemini API 응답을 파싱할 수 없습니다.',
+        details: geminiRes.data
+      });
     }
   } catch(e) {
     console.error('Auto-recommend error:', e.message);
@@ -2385,7 +2399,7 @@ ${JSON.stringify(contextData.marginData, null, 2)}
     const geminiRes = await httpsPost(
       'generativelanguage.googleapis.com',
       `/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-      { 'Content-Type': 'application/json' },
+      { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(geminiBody) },
       geminiBody
     );
 
