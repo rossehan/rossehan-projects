@@ -19,6 +19,8 @@
 - `/vitaview/.env` - SP-API credentials (gitignored)
 
 ## Completed Features
+
+### Phase 1: Core Dashboard
 1. Dashboard with 2 tabs: Dashboard, Browse & Search (merged)
 2. 100 supplement categories with real SP-API data (expanded from 50)
 3. Top 100 Products by Sales Rank (clickable -> detail modal)
@@ -44,14 +46,15 @@
 23. Market Opportunity Score = demand(30%) + competition(25%) + priceRoom(20%) + revenue(25%)
 24. HHI (Herfindahl-Hirschman Index): <1500=Low competition, 1500-2500=Mid, >2500=High (hard to enter)
 25. White/light theme UI (changed from dark theme)
-26. Trend hashtag rolling banner under Opportunity Score (#Magnesium, #GutHealth, #Fiber, etc.)
+26. Trend hashtag rolling banner under Opportunity Score
 27. Competition Analysis with expandable product list (click to see top products per category)
 28. Form Analysis (Dosage Type) section: Gummy, Capsule, Softgel, Tablet, Powder, Liquid, etc.
 29. Form extraction from product title using regex patterns
 30. Ingredient extraction from product title using regex patterns
 31. Keyword filtering in dashboard (filter categories by keyword like "Peptide", "Gummy", etc.)
-32. New categories added: Lutein, Astaxanthin, DHEA, 5-HTP, L-Theanine, L-Carnitine, ALA, NAC, DIM, Tribulus, Tongkat Ali, Shilajit, Cordyceps, Chaga, Turkey Tail, Moringa, Sea Moss, Olive Leaf, Oregano Oil, Vitamin A, Folate, Chromium, Iodine, Boron, Copper, Inositol, PQQ, NMN, Hyaluronic Acid, Keratin, MSM, Chondroitin, Bromelain, Psyllium Husk, Bovine Colostrum, Beta Alanine, Citrulline, Electrolytes, Whey Protein, Casein, Pea Protein, Hemp Protein, Fish Oil, Krill Oil, Evening Primrose, Black Cohosh, St. John's Wort, Bilberry
+32. New categories added (100 total)
 
+### Phase 2: AI Market Domination
 33. AI Market Domination Analysis tab - separate tab with full domination scoring algorithm
 34. Domination Score = Fragmentation(30%) + Weak Leader(20%) + Supply-Demand Gap(20%) + Revenue(15%) + Price Gap(15%)
 35. Top 1 Spotlight card with WHY DOMINATE, ENTRY STRATEGY, MARKET DATA
@@ -59,34 +62,59 @@
 37. Top 10 detailed cards with score breakdown, entry strategy, competitor landscape, top products
 38. AI Recommendation Summary (dark theme) with immediate entry targets and high revenue targets
 39. Methodology explainer section
+40. Keyword Intelligence sub-tab
+41. Trend Analysis sub-tab
+42. Domination Score enhanced: 6th factor "Trend Momentum" (15%)
 
-40. Keyword Intelligence sub-tab: top keywords, compound keywords, cross-category trending ingredients, form trends, premium vs budget keywords
-41. Trend Analysis sub-tab: Google search trend keywords (via Autocomplete API), Google+Amazon overlap analysis, category trend momentum ranking
-42. Hashtag Discovery sub-tab: ingredient hashtags, Google trend hashtags, product form hashtags, lifestyle/marketing hashtags
-43. Domination Score enhanced: 6th factor "Trend Momentum" (15%) added using keyword intelligence + Google trends data
-44. AI Domination now has 4 sub-tabs: Domination Score, Keyword Intelligence, Trend Analysis, Hashtag Discovery
+### Phase 3: Market Intelligence & Modules
+43. Market Intelligence Hub tab (Overview, YouTube, Reddit, FDA Safety, Google Trends)
+44. Google Trends, YouTube Data API v3, Reddit API, OpenFDA API integrations
+45. Module 1: Amazon Long-tail Keyword Extractor (removed in v2 - replaced by Search Demand)
+46. Module 2: Competitor Pain Point Analyzer - Reddit search + NLP
+47. Module 3: Entry Barrier & Legal Risk Checker - HHI + brand concentration + patent links
+48. Module 4: 1/3 Rule Margin Calculator - COGS/Fees/Profit breakdown
 
-45. Market Intelligence Hub tab - new "Market Intel" tab with 5 sub-tabs (Overview, YouTube, Reddit, FDA Safety, Google Trends)
-46. Google Trends API integration - interest over time graphs, Google Autocomplete signals
-47. YouTube Data API v3 integration - trending supplement videos, ingredient mentions from video titles (demo mode when no API key)
-48. Reddit API integration (public JSON, no auth) - r/supplements, r/nootropics, r/nutrition, r/fitness hot posts, sentiment analysis, trending supplement mentions
-49. OpenFDA API integration - adverse events, recalls, drug interactions, safety scores per ingredient, batch safety check
-50. Market Intelligence Summary endpoint - combines all data sources
-51. YouTube demo mode with curated data when YOUTUBE_API_KEY not set
+### Phase 4: AI Supplement Formulator
+49. AI Supplement Formulator tab - Gemini 2.0 Flash integration
+50. 12 health concern categories: sleep, immunity, gut, energy, beauty, weight, joints, mens, womens, longevity, stress, muscle
+51. /api/ai-formulator/context: 5-API data aggregation
+52. /api/ai-formulator/generate: Gemini LLM product formulation
+53. /api/ai-formulator/auto-recommend: 사용자 맞춤형 3개 제품 자동 추천
 
-52. Module 1: Amazon Long-tail Keyword Extractor - Amazon autocomplete API, 500ms rate limit, 1hr cache, "Longtail Keywords" sub-tab in AI Domination
-53. Module 2: Competitor Pain Point Analyzer - Reddit search + NLP (8 categories: taste, efficacy, side effects, quality, dosage, price, packaging, transparency), "Pain Points" sub-tab in Market Intel
-54. Module 3: Entry Barrier & Legal Risk Checker - HHI + brand concentration analysis, USPTO/Google Patents search links, "Legal Barrier" sub-tab in AI Domination
-55. Module 4: 1/3 Rule Margin Calculator - COGS/Fees/Profit breakdown, viability ratings, Alibaba sourcing links, "Margin Calculator" sub-tab in AI Domination
-56. AI Domination now has 7 sub-tabs: Domination Score, Keyword Intelligence, Trend Analysis, Hashtag Discovery, Longtail Keywords, Legal Barrier, Margin Calculator
-57. Market Intel now has 6 sub-tabs: Overview, YouTube, Reddit, FDA Safety, Google Trends, Pain Points
+### Phase 5: Opportunity Score System
+54. Opportunity Score = BSR변동폭(25%) + 경쟁(HHI)(25%) + 가격차이(20%) + 수요(15%) + 트렌드(15%)
+55. HHI 반전 로직: HHI 낮을수록(경쟁 분산) = 기회 점수 높음
+56. BSR 변동폭: top 10 제품의 BSR 표준편차 기반 시장 불안정성 측정
+57. Opportunity Score 배지: result banner, product cards, detail view, Score Breakdown 카드
+58. Category Opportunity Score 테이블 (데이터 섹션)
 
-58. AI Supplement Formulator - "Market Intel" tab replaced with "AI Formulator"
-59. Gemini 2.0 Flash integration for AI-powered product formulation
-60. 12 health concern categories: sleep, immunity, gut, energy, beauty, weight, joints, mens, womens, longevity, stress, muscle
-61. /api/ai-formulator/context: 5-API data aggregation (SP-API + Reddit + FDA + Google Trends + Margin)
-62. /api/ai-formulator/generate: Gemini LLM product formulation with structured JSON output
-63. AI generates: product name, ingredients, competitor weaknesses, FDA safety report, pricing strategy, Amazon listing copy
+### Phase 6: VitaView v2 (2026-03-16)
+**Backend (db.js + server.js)**
+59. SQLite DB (better-sqlite3, WAL mode) - 6개 테이블 + 헬퍼 함수 (db.js 신규 파일)
+    - trend_snapshots, category_rankings, emerging_keywords, competitor_products, fda_signals, search_demand_snapshots
+    - DB 경로: /vitaview/data/vitaview.db (Render.com 대비 고정 경로)
+60. Google Trends API (google-trends-api npm) + DB fallback 안정화
+61. 키워드 비교 API: /api/compare?keywords=x,y,z, /api/compare/history?days=30
+62. Data Confidence 점수 시스템 - 5개 신호원 가중 점수 (googleTrends 0.25, reddit 0.25, youtube 0.20, amazonBSR 0.20, patents 0.10)
+63. Emerging Keywords 감지 - Reddit + Google Suggestions 기반, /api/emerging
+64. Competitor Product ASIN 추적 + BSR 히스토리 append, /api/new-products?category=x&days=90
+65. Gemini AI 전략 분석 6시간 캐시 (getGeminiStrategyAnalysis)
+66. OpenFDA 부작용 트렌드 분석 + DB 캐싱 (analyzeFDASignals)
+67. node-cron 자동화: 매일 6AM UTC 키워드 스냅샷 + 6시간 주기 emerging keyword 감지
+68. 히스토리/대시보드 API: /api/history?keyword=x&days=30, /api/dashboard
+69. /api/opportunity-score 응답에 dataConfidence, aiStrategy 필드 추가
+70. /api/ai-formulator/auto-recommend 응답에 dataConfidence, aiDisclaimer 필드 추가
+
+**Frontend (dashboard.html)**
+71. Legal Barrier 탭 UI 전면 교체: 진입난이도 배지(LOW/MEDIUM/HIGH/VERY_HIGH) + HHI 표시 + 특허검색 버튼(USPTO/Google Patents) + Top Brands 점유율
+72. Longtail Keywords 탭 제거 (코드 + state + useEffect 모두 삭제)
+73. Search Demand Intelligence 탭 (Hashtag Discovery 대체): 4섹션
+    - 아마존 인기성분 ([Amazon] 배지, # 없음)
+    - Google 트렌딩 검색어 ([Google Trends] 배지)
+    - 제형 트렌드 (수평 바 차트, [Amazon] 배지)
+    - 소비자 관심 키워드 (다중 소스 라벨 [Amazon], [Google], [Reddit])
+74. ROI/매출 수치에 'AI 추정값' 노란 라벨 배지 추가 (월매출, 월순이익, 1년ROI, 연간매출, 연간순이익, 우리예상매출)
+75. AI Domination 서브탭: Domination Score, Keyword Intelligence, Trend Analysis, Search Demand, Legal Barrier, Margin Calculator (6개)
 
 ## External API Keys
 - YOUTUBE_API_KEY: Optional, in .env file. Demo mode works without it.
