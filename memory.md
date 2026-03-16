@@ -74,11 +74,20 @@
 50. Market Intelligence Summary endpoint - combines all data sources
 51. YouTube demo mode with curated data when YOUTUBE_API_KEY not set
 
+52. Module 1: Amazon Long-tail Keyword Extractor - Amazon autocomplete API, 500ms rate limit, 1hr cache, "Longtail Keywords" sub-tab in AI Domination
+53. Module 2: Competitor Pain Point Analyzer - Reddit search + NLP (8 categories: taste, efficacy, side effects, quality, dosage, price, packaging, transparency), "Pain Points" sub-tab in Market Intel
+54. Module 3: Entry Barrier & Legal Risk Checker - HHI + brand concentration analysis, USPTO/Google Patents search links, "Legal Barrier" sub-tab in AI Domination
+55. Module 4: 1/3 Rule Margin Calculator - COGS/Fees/Profit breakdown, viability ratings, Alibaba sourcing links, "Margin Calculator" sub-tab in AI Domination
+56. AI Domination now has 7 sub-tabs: Domination Score, Keyword Intelligence, Trend Analysis, Hashtag Discovery, Longtail Keywords, Legal Barrier, Margin Calculator
+57. Market Intel now has 6 sub-tabs: Overview, YouTube, Reddit, FDA Safety, Google Trends, Pain Points
+
 ## External API Keys
 - YOUTUBE_API_KEY: Optional, in .env file. Demo mode works without it.
 - Reddit: No key needed (public JSON endpoints)
 - OpenFDA: No key needed (completely free)
 - Google Trends: No key needed (scraping approach)
+- Amazon Autocomplete: No key needed (public endpoint completion.amazon.com)
+- USPTO/Google Patents: No key needed (search links generated, no API calls)
 
 ## SP-API Data Structure (CRITICAL - DO NOT FORGET)
 - **Price**: `list_price[0].value` is a direct NUMBER (e.g. 17.98), NOT `{amount: "xx.xx"}`
@@ -119,6 +128,11 @@
 - GET `/api/market-intel/fda?ingredient=X` - OpenFDA safety data for single ingredient
 - GET `/api/market-intel/fda-batch` - Batch FDA safety scores for multiple ingredients
 - GET `/api/market-intel/summary` - Combined intelligence from all sources
+- GET `/api/amazon-suggest?q=keyword` - Amazon autocomplete suggestions (Module 1)
+- GET `/api/longtail-keywords?category=X` - Long-tail keyword extraction from Amazon autocomplete (Module 1)
+- GET `/api/painpoint-analysis?category=X` - Reddit-based competitor pain point analysis (Module 2)
+- GET `/api/legal-barrier?category=X` - Entry barrier & legal risk check using brand data (Module 3)
+- GET `/api/margin-calculator?category=X` - 1/3 rule margin calculator with Alibaba links (Module 4)
 
 ## Category Keywords (100 categories)
 vitamins, protein, omega, probiotics, collagen, magnesium, vitaminD, vitaminC, zinc, iron, calcium, biotin, melatonin, ashwagandha, creatine, turmeric, elderberry, fiber, multivitamin, bcaa, glutamine, coq10, vitaminB, vitaminE, vitaminK, potassium, selenium, manganese, lysine, glucosamine, spirulina, chlorella, echinacea, ginseng, garlic, greenTea, appleCiderVinegar, maca, saw_palmetto, milk_thistle, rhodiola, valerian, fenugreek, black_seed_oil, quercetin, resveratrol, lions_mane, reishi, berberine, digestive_enzymes, lutein, astaxanthin, dhea, five_htp, l_theanine, l_carnitine, alpha_lipoic_acid, nac, dim, tribulus, tongkat_ali, shilajit, cordyceps, chaga, turkey_tail, moringa, sea_moss, olive_leaf, oregano_oil, vitamin_a, folate, chromium, iodine, boron, copper, inositol, pqq, nmn, hyaluronic_acid, keratin, msm, chondroitin, bromelain, psyllium_husk, bovine_colostrum, beta_alanine, citrulline, electrolytes, whey_protein, casein, pea_protein, hemp_protein, fish_oil, krill_oil, evening_primrose, black_cohosh, st_johns_wort, bilberry
