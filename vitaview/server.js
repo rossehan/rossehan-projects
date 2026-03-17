@@ -65,6 +65,41 @@ function httpsGet(hostname, path, headers) {
   });
 }
 
+// Gemini API 호출 헬퍼 (재시도 + 모델 폴백)
+const GEMINI_MODELS = ['gemini-2.5-flash-lite', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+
+async function callGemini(geminiBody, apiKey) {
+  for (const model of GEMINI_MODELS) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        if (attempt > 0 || model !== GEMINI_MODELS[0]) {
+          console.log(`🔄 Gemini retry: model=${model}, attempt=${attempt + 1}`);
+        }
+        const bodyStr = typeof geminiBody === 'string' ? geminiBody : JSON.stringify(geminiBody);
+        const res = await httpsPost(
+          'generativelanguage.googleapis.com',
+          `/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr) },
+          bodyStr
+        );
+        // 503/429 = 과부하/rate limit → 재시도
+        if (res.status === 503 || res.status === 429) {
+          console.log(`⚠️ Gemini ${model} returned ${res.status}, trying next...`);
+          await new Promise(r => setTimeout(r, (attempt + 1) * 2000));
+          continue;
+        }
+        res._model = model;
+        return res;
+      } catch(e) {
+        console.log(`⚠️ Gemini ${model} error: ${e.message}`);
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+  }
+  // 모든 모델 실패
+  return { status: 503, data: { error: { code: 503, message: '모든 Gemini 모델이 현재 과부하 상태입니다. 잠시 후 다시 시도해주세요.' } } };
+}
+
 async function getAccessToken() {
   if (accessToken && Date.now() < tokenExpiry) return accessToken;
   const body = querystring.stringify({
@@ -2550,14 +2585,9 @@ ${considerationList ? `특히 다음 사항을 우선적으로 고려해: ${cons
     console.log('🤖 Smart-recommend: calling Gemini with user preferences...');
     console.log('📋 Target:', targetMarket, '| Ingredients:', preferredIngredients, '| Form:', formType, '| Budget:', budget);
 
-    const geminiRes = await httpsPost(
-      'generativelanguage.googleapis.com',
-      `/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
-      { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(geminiBody) },
-      geminiBody
-    );
+    const geminiRes = await callGemini(geminiBody, GEMINI_API_KEY);
 
-    console.log('📡 Gemini response status:', geminiRes.status);
+    console.log('📡 Gemini response status:', geminiRes.status, '| model:', geminiRes._model || 'unknown');
     if (geminiRes.data?.error) {
       console.log('❌ Gemini error:', JSON.stringify(geminiRes.data.error));
     }
@@ -2942,12 +2972,7 @@ ${JSON.stringify(contextData.marginData, null, 2)}
       }
     });
 
-    const geminiRes = await httpsPost(
-      'generativelanguage.googleapis.com',
-      `/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
-      { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(geminiBody) },
-      geminiBody
-    );
+    const geminiRes = await callGemini(geminiBody, GEMINI_API_KEY);
 
     if (geminiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
       let aiResponse;
@@ -2969,7 +2994,7 @@ ${JSON.stringify(contextData.marginData, null, 2)}
         timestamp: new Date().toISOString()
       });
     } else {
-      res.json({ error: 'Gemini response error', details: geminiRes.data, contextData });
+      res.json({ error: 'Gemini response error', message: geminiRes.data?.error?.message || 'Gemini API 응답 실패', details: geminiRes.data, contextData });
     }
   } catch(e) {
     res.status(500).json({ error: 'Gemini API call failed: ' + e.message, contextData });
@@ -3206,18 +3231,13 @@ async function getGeminiStrategyAnalysis(keyword, opportunityData) {
       generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
     });
 
-    const response = await httpsPost(
-      'generativelanguage.googleapis.com',
-      `/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${GEMINI_API_KEY}`,
-      { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(geminiBody) },
-      geminiBody
-    );
+    const response = await callGemini(geminiBody, GEMINI_API_KEY);
 
     const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
     const result = {
       summary: text || 'AI 분석 실패',
       generatedAt: new Date().toISOString(),
-      model: 'gemini-2.5-flash-lite',
+      model: response._model || 'gemini-2.5-flash-lite',
       isAIGenerated: true
     };
     geminiStrategyCache[cacheKey] = { data: result, time: Date.now() };
