@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrendRadar — 보충제 시장 인텔리전스</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; color: #1a1a2e; }
+
+/* Header */
+.header { background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%); color: #fff; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 12px rgba(0,0,0,0.3); }
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-left h1 { font-size: 22px; font-weight: 700; }
+.header-left h1 span { color: #00d4ff; }
+.badge { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+.badge-live { background: #00e676; color: #000; }
+.badge-demo { background: #ff9800; color: #000; }
+.header-right { display: flex; align-items: center; gap: 12px; font-size: 13px; color: #aaa; }
+.refresh-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; transition: all .2s; }
+.refresh-btn:hover { background: rgba(255,255,255,0.25); }
+
+/* Tabs */
+.tabs { display: flex; background: #fff; border-bottom: 2px solid #e0e0e0; padding: 0 24px; }
+.tab { padding: 12px 20px; cursor: pointer; font-size: 14px; font-weight: 600; color: #666; border-bottom: 3px solid transparent; transition: all .2s; }
+.tab:hover { color: #302b63; }
+.tab.active { color: #302b63; border-bottom-color: #302b63; }
+
+/* Container */
+.container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+/* Cards */
+.card { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+.card-title { font-size: 16px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+
+/* Grid */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+/* Opportunity Table */
+.opp-table { width: 100%; border-collapse: collapse; }
+.opp-table th { text-align: left; padding: 10px 12px; background: #f8f9fa; font-size: 12px; color: #666; font-weight: 600; border-bottom: 2px solid #e0e0e0; white-space: nowrap; }
+.opp-table td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+.opp-table tr:hover { background: #f8f9ff; }
+.opp-table .keyword { font-weight: 700; font-size: 14px; text-transform: capitalize; }
+
+/* Score bar */
+.score-bar-wrap { display: flex; align-items: center; gap: 8px; }
+.score-bar { width: 80px; height: 8px; background: #e8e8e8; border-radius: 4px; overflow: hidden; }
+.score-bar-fill { height: 100%; border-radius: 4px; transition: width .5s; }
+.score-num { font-weight: 700; font-size: 15px; min-width: 28px; }
+
+/* Verdict */
+.verdict { padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.verdict-green { background: #e8f5e9; color: #2e7d32; }
+.verdict-yellow { background: #fff8e1; color: #f57f17; }
+.verdict-red { background: #fce4ec; color: #c62828; }
+
+/* Metric chips */
+.metric-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.metric-up { background: #e3f2fd; color: #1565c0; }
+.metric-down { background: #fce4ec; color: #c62828; }
+.metric-neutral { background: #f5f5f5; color: #666; }
+
+/* Golden Time */
+.golden-card { border-left: 4px solid #ffd600; padding: 14px 16px; margin-bottom: 10px; background: #fffde7; border-radius: 0 8px 8px 0; }
+.golden-card.expired { border-left-color: #bdbdbd; background: #fafafa; opacity: 0.7; }
+.golden-card .kw { font-size: 16px; font-weight: 700; text-transform: capitalize; }
+.golden-card .info { font-size: 12px; color: #666; margin-top: 4px; }
+.golden-active { display: inline-block; padding: 2px 8px; background: #ffd600; color: #000; border-radius: 4px; font-size: 11px; font-weight: 700; animation: pulse 2s infinite; }
+.golden-ended { display: inline-block; padding: 2px 8px; background: #e0e0e0; color: #666; border-radius: 4px; font-size: 11px; font-weight: 600; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+/* Podcast */
+.podcast-item { padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+.podcast-item:last-child { border-bottom: none; }
+.podcast-meta { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; }
+.influencer-tag { padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; color: #fff; }
+.tag-huberman { background: #1565c0; }
+.tag-attia { background: #6a1b9a; }
+.tag-sinclair { background: #00695c; }
+.tag-brecka { background: #e65100; }
+.tag-default { background: #546e7a; }
+.podcast-quote { font-style: italic; color: #555; font-size: 13px; padding: 6px 12px; border-left: 3px solid #e0e0e0; margin-top: 6px; }
+
+/* Trend bars */
+.trend-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f5f5f5; }
+.trend-row:last-child { border-bottom: none; }
+.trend-kw { width: 120px; font-weight: 600; font-size: 13px; text-transform: capitalize; }
+.trend-bar-wrap { flex: 1; height: 24px; background: #f0f0f0; border-radius: 6px; position: relative; overflow: hidden; }
+.trend-bar-fill { height: 100%; border-radius: 6px; display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; font-size: 11px; font-weight: 700; color: #fff; transition: width .6s; }
+.trend-growth { width: 80px; text-align: right; font-size: 13px; font-weight: 700; }
+
+/* Score breakdown */
+.breakdown { display: flex; gap: 4px; flex-wrap: wrap; }
+.breakdown-item { font-size: 10px; padding: 2px 6px; border-radius: 3px; background: #f0f0f0; color: #555; }
+
+/* Strategy tooltip */
+.strategy { font-size: 12px; color: #555; margin-top: 4px; line-height: 1.4; }
+
+/* Summary stats */
+.stat-card { text-align: center; padding: 16px; }
+.stat-num { font-size: 32px; font-weight: 800; }
+.stat-num.green { color: #2e7d32; }
+.stat-num.yellow { color: #f57f17; }
+.stat-num.red { color: #c62828; }
+.stat-num.blue { color: #1565c0; }
+.stat-label { font-size: 12px; color: #888; margin-top: 4px; }
+
+/* Loading */
+.loading { text-align: center; padding: 40px; color: #999; }
+.spinner { display: inline-block; width: 32px; height: 32px; border: 3px solid #e0e0e0; border-top-color: #302b63; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Detail modal */
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 200; display: flex; align-items: center; justify-content: center; }
+.modal-content { background: #fff; border-radius: 16px; padding: 28px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 8px 40px rgba(0,0,0,0.2); }
+.modal-close { float: right; background: none; border: none; font-size: 22px; cursor: pointer; color: #999; }
+.modal-close:hover { color: #333; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+
+// ── App ──
+function App() {
+  const [tab, setTab] = useState('radar');
+  const [mode, setMode] = useState('demo');
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const [opportunities, setOpportunities] = useState([]);
+  const [origins, setOrigins] = useState([]);
+  const [podcasts, setPodcasts] = useState([]);
+  const [trends, setTrends] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedKeyword, setSelectedKeyword] = useState(null);
+
+  const fetchAll = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [healthRes, oppRes, origRes, podRes, trendRes] = await Promise.all([
+        fetch('/api/health').then(r => r.json()),
+        fetch('/api/opportunities').then(r => r.json()),
+        fetch('/api/origins').then(r => r.json()),
+        fetch('/api/podcasts').then(r => r.json()),
+        fetch('/api/trends').then(r => r.json()),
+      ]);
+      setMode(healthRes.mode);
+      setLastUpdate(new Date().toLocaleTimeString('ko-KR'));
+      setOpportunities(oppRes);
+      setOrigins(origRes);
+      setPodcasts(podRes);
+      setTrends(trendRes);
+    } catch (err) {
+      console.error('Fetch error:', err);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  return (
+    <div>
+      <div className="header">
+        <div className="header-left">
+          <h1>📡 Trend<span>Radar</span></h1>
+          <span className={`badge ${mode === 'live' ? 'badge-live' : 'badge-demo'}`}>
+            {mode === 'live' ? 'LIVE' : 'DEMO'}
+          </span>
+        </div>
+        <div className="header-right">
+          {lastUpdate && <span>마지막 업데이트: {lastUpdate}</span>}
+          <button className="refresh-btn" onClick={fetchAll}>⟳ 새로고침</button>
+        </div>
+      </div>
+
+      <div className="tabs">
+        <div className={`tab ${tab === 'radar' ? 'active' : ''}`} onClick={() => setTab('radar')}>
+          🎯 기회 레이더
+        </div>
+        <div className={`tab ${tab === 'golden' ? 'active' : ''}`} onClick={() => setTab('golden')}>
+          ⚡ 골든타임
+        </div>
+        <div className={`tab ${tab === 'signals' ? 'active' : ''}`} onClick={() => setTab('signals')}>
+          📊 시그널 모니터
+        </div>
+        <div className={`tab ${tab === 'podcast' ? 'active' : ''}`} onClick={() => setTab('podcast')}>
+          🎙️ 팟캐스트
+        </div>
+      </div>
+
+      <div className="container">
+        {loading ? (
+          <div className="loading"><div className="spinner"></div><p style={{marginTop:12}}>데이터 로딩 중...</p></div>
+        ) : (
+          <>
+            {tab === 'radar' && <RadarTab opportunities={opportunities} onSelect={setSelectedKeyword} />}
+            {tab === 'golden' && <GoldenTab origins={origins} />}
+            {tab === 'signals' && <SignalsTab trends={trends} opportunities={opportunities} />}
+            {tab === 'podcast' && <PodcastTab podcasts={podcasts} />}
+          </>
+        )}
+      </div>
+
+      {selectedKeyword && (
+        <DetailModal
+          keyword={selectedKeyword}
+          opportunities={opportunities}
+          origins={origins}
+          podcasts={podcasts}
+          trends={trends}
+          onClose={() => setSelectedKeyword(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── 기회 레이더 ──
+function RadarTab({ opportunities, onSelect }) {
+  const greenCount = opportunities.filter(o => o.opportunity_score >= 80).length;
+  const yellowCount = opportunities.filter(o => o.opportunity_score >= 60 && o.opportunity_score < 80).length;
+  const redCount = opportunities.filter(o => o.opportunity_score < 60).length;
+  const topKeyword = opportunities[0];
+
+  return (
+    <>
+      <div className="grid-3" style={{marginBottom:16}}>
+        <div className="card stat-card">
+          <div className="stat-num green">{greenCount}</div>
+          <div className="stat-label">🟢 지금 진입 가능</div>
+        </div>
+        <div className="card stat-card">
+          <div className="stat-num yellow">{yellowCount}</div>
+          <div className="stat-label">🟡 모니터링 중</div>
+        </div>
+        <div className="card stat-card">
+          <div className="stat-num red">{redCount}</div>
+          <div className="stat-label">🔴 포화 시장</div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-title">🎯 Opportunity Score 랭킹</div>
+        <div style={{overflowX:'auto'}}>
+          <table className="opp-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>키워드</th>
+                <th>점수</th>
+                <th>판정</th>
+                <th>IG 주간성장</th>
+                <th>Google 성장률</th>
+                <th>FB 광고주</th>
+                <th>팟캐스트 언급일</th>
+                <th>전략</th>
+              </tr>
+            </thead>
+            <tbody>
+              {opportunities.map((o, i) => (
+                <tr key={o.keyword} style={{cursor:'pointer'}} onClick={() => onSelect(o.keyword)}>
+                  <td style={{fontWeight:700,color:'#999'}}>{i + 1}</td>
+                  <td className="keyword">{o.keyword}</td>
+                  <td>
+                    <div className="score-bar-wrap">
+                      <span className="score-num" style={{color: scoreColor(o.opportunity_score)}}>
+                        {Math.round(o.opportunity_score)}
+                      </span>
+                      <div className="score-bar">
+                        <div className="score-bar-fill" style={{
+                          width: `${o.opportunity_score}%`,
+                          background: scoreColor(o.opportunity_score)
+                        }}></div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`verdict ${verdictClass(o.opportunity_score)}`}>
+                      {o.verdict || verdictText(o.opportunity_score)}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`metric-chip ${o.instagram_weekly_growth > 0 ? 'metric-up' : o.instagram_weekly_growth < 0 ? 'metric-down' : 'metric-neutral'}`}>
+                      {o.instagram_weekly_growth > 0 ? '↑' : o.instagram_weekly_growth < 0 ? '↓' : '→'} {Math.abs(o.instagram_weekly_growth || 0).toFixed(1)}%
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`metric-chip ${o.google_growth_rate > 0 ? 'metric-up' : o.google_growth_rate < 0 ? 'metric-down' : 'metric-neutral'}`}>
+                      {o.google_growth_rate > 0 ? '↑' : o.google_growth_rate < 0 ? '↓' : '→'} {Math.abs(o.google_growth_rate || 0).toFixed(1)}%
+                    </span>
+                  </td>
+                  <td style={{textAlign:'center'}}>{o.facebook_advertiser_count || '-'}</td>
+                  <td style={{fontSize:12,color:'#888'}}>{o.podcast_mention_date || '-'}</td>
+                  <td><div className="strategy" style={{maxWidth:200}}>{o.strategy_comment || '-'}</div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── 골든타임 ──
+function GoldenTab({ origins }) {
+  const active = origins.filter(o => o.golden_time_start && !o.golden_time_end);
+  const ended = origins.filter(o => o.golden_time_end);
+
+  return (
+    <>
+      <div className="card">
+        <div className="card-title">⚡ 골든타임 진행 중 ({active.length})</div>
+        <p style={{fontSize:12,color:'#888',marginBottom:12}}>
+          인플루언서 언급 → 대형 광고주 진입 전까지의 선점 기회 윈도우
+        </p>
+        {active.length === 0 && <p style={{color:'#999',padding:20,textAlign:'center'}}>현재 진행 중인 골든타임 없음</p>}
+        {active.map(o => {
+          const days = Math.floor((Date.now() - new Date(o.golden_time_start).getTime()) / 86400000);
+          return (
+            <div key={o.keyword} className="golden-card">
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <span className="kw">{o.keyword}</span>
+                <span className="golden-active">⚡ 골든타임 {days}일째</span>
+              </div>
+              <div className="info">
+                최초 언급: {o.first_podcast_influencer} — {o.first_podcast_date} |
+                IG 성장: +{(o.market_creator_ig_growth || 0).toFixed(1)}%
+              </div>
+              {o.analysis_report && (
+                <div className="strategy" style={{marginTop:8}}>{o.analysis_report}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {ended.length > 0 && (
+        <div className="card">
+          <div className="card-title">📋 종료된 골든타임 ({ended.length})</div>
+          {ended.map(o => (
+            <div key={o.keyword} className="golden-card expired">
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <span className="kw">{o.keyword}</span>
+                <span className="golden-ended">종료 — {o.golden_time_duration_days}일간 지속</span>
+              </div>
+              <div className="info">
+                {o.first_podcast_influencer} 최초 언급 ({o.first_podcast_date}) →
+                광고주 진입 ({o.golden_time_end})
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── 시그널 모니터 ──
+function SignalsTab({ trends, opportunities }) {
+  const maxAvg = Math.max(...trends.map(t => t.current_3m_avg || 0), 1);
+
+  return (
+    <div className="grid-2">
+      <div className="card">
+        <div className="card-title">📈 Google Trends (3개월 평균)</div>
+        {trends.map(t => (
+          <div key={t.keyword} className="trend-row">
+            <div className="trend-kw">{t.keyword}</div>
+            <div className="trend-bar-wrap">
+              <div className="trend-bar-fill" style={{
+                width: `${((t.current_3m_avg || 0) / maxAvg) * 100}%`,
+                background: t.trend_direction === 'rising' ? '#2e7d32' : t.trend_direction === 'falling' ? '#c62828' : '#f57f17'
+              }}>
+                {t.current_3m_avg}
+              </div>
+            </div>
+            <div className="trend-growth" style={{color: (t.growth_rate || 0) >= 0 ? '#2e7d32' : '#c62828'}}>
+              {(t.growth_rate || 0) >= 0 ? '+' : ''}{(t.growth_rate || 0).toFixed(1)}%
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <div className="card-title">📊 Instagram 주간 성장률</div>
+        {opportunities.filter(o => o.instagram_weekly_growth != null).sort((a, b) => b.instagram_weekly_growth - a.instagram_weekly_growth).map(o => (
+          <div key={o.keyword} className="trend-row">
+            <div className="trend-kw">{o.keyword}</div>
+            <div className="trend-bar-wrap">
+              <div className="trend-bar-fill" style={{
+                width: `${Math.min(Math.max(o.instagram_weekly_growth, 0), 50) / 50 * 100}%`,
+                background: o.instagram_weekly_growth > 20 ? '#1565c0' : o.instagram_weekly_growth > 0 ? '#42a5f5' : '#ef5350'
+              }}>
+                {o.instagram_weekly_growth > 5 ? `${o.instagram_weekly_growth.toFixed(1)}%` : ''}
+              </div>
+            </div>
+            <div className="trend-growth" style={{color: o.instagram_weekly_growth >= 0 ? '#1565c0' : '#c62828'}}>
+              {o.instagram_weekly_growth >= 0 ? '+' : ''}{o.instagram_weekly_growth.toFixed(1)}%
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card" style={{gridColumn:'1 / -1'}}>
+        <div className="card-title">🏢 Facebook 광고 경쟁도</div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:10}}>
+          {opportunities.sort((a, b) => (a.facebook_advertiser_count || 0) - (b.facebook_advertiser_count || 0)).map(o => {
+            const count = o.facebook_advertiser_count || 0;
+            const level = count < 15 ? 'low' : count < 40 ? 'mid' : 'high';
+            const colors = { low: '#e8f5e9', mid: '#fff8e1', high: '#fce4ec' };
+            const textColors = { low: '#2e7d32', mid: '#f57f17', high: '#c62828' };
+            const labels = { low: '낮음', mid: '중간', high: '높음' };
+            return (
+              <div key={o.keyword} style={{
+                background: colors[level], padding: '10px 16px', borderRadius: 8,
+                minWidth: 140, textAlign: 'center'
+              }}>
+                <div style={{fontWeight:700,fontSize:14,textTransform:'capitalize'}}>{o.keyword}</div>
+                <div style={{fontSize:24,fontWeight:800,color:textColors[level],margin:'4px 0'}}>{count}</div>
+                <div style={{fontSize:11,color:textColors[level]}}>광고주 · 경쟁 {labels[level]}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── 팟캐스트 ──
+function PodcastTab({ podcasts }) {
+  const influencers = [...new Set(podcasts.map(p => p.influencer))];
+  const [filter, setFilter] = useState('all');
+  const filtered = filter === 'all' ? podcasts : podcasts.filter(p => p.influencer === filter);
+
+  return (
+    <div className="card">
+      <div className="card-title">🎙️ 최근 팟캐스트 키워드 언급</div>
+      <div style={{display:'flex',gap:6,marginBottom:14,flexWrap:'wrap'}}>
+        <button onClick={() => setFilter('all')} style={{
+          padding:'4px 12px', borderRadius:6, border: filter==='all' ? '2px solid #302b63' : '1px solid #ddd',
+          background: filter==='all' ? '#302b63' : '#fff', color: filter==='all' ? '#fff' : '#333',
+          cursor:'pointer', fontSize:12, fontWeight:600
+        }}>전체</button>
+        {influencers.map(inf => (
+          <button key={inf} onClick={() => setFilter(inf)} style={{
+            padding:'4px 12px', borderRadius:6, border: filter===inf ? '2px solid #302b63' : '1px solid #ddd',
+            background: filter===inf ? '#302b63' : '#fff', color: filter===inf ? '#fff' : '#333',
+            cursor:'pointer', fontSize:12, fontWeight:600, textTransform:'capitalize'
+          }}>{inf}</button>
+        ))}
+      </div>
+      {filtered.map((p, i) => (
+        <div key={i} className="podcast-item">
+          <div className="podcast-meta">
+            <span className={`influencer-tag tag-${p.influencer || 'default'}`}>
+              {(p.influencer || '').toUpperCase()}
+            </span>
+            <span style={{fontWeight:700,fontSize:14,textTransform:'capitalize'}}>{p.keyword}</span>
+            <span style={{fontSize:11,color:'#999'}}>{p.mentioned_date}</span>
+            {p.mention_context && (
+              <span style={{fontSize:10,padding:'1px 6px',background:'#f0f0f0',borderRadius:3,color:'#666'}}>
+                {contextLabel(p.mention_context)}
+              </span>
+            )}
+          </div>
+          <div style={{fontSize:13,color:'#444'}}>{p.episode_title}</div>
+          {p.mention_quote && <div className="podcast-quote">"{p.mention_quote}"</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── 상세 모달 ──
+function DetailModal({ keyword, opportunities, origins, podcasts, trends, onClose }) {
+  const opp = opportunities.find(o => o.keyword === keyword);
+  const origin = origins.find(o => o.keyword === keyword);
+  const trend = trends.find(t => t.keyword === keyword);
+  const kwPodcasts = podcasts.filter(p => p.keyword === keyword);
+
+  if (!opp) return null;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <button className="modal-close" onClick={onClose}>✕</button>
+        <h2 style={{textTransform:'capitalize',marginBottom:4}}>{keyword}</h2>
+        <span className={`verdict ${verdictClass(opp.opportunity_score)}`} style={{marginBottom:16,display:'inline-block'}}>
+          {opp.verdict || verdictText(opp.opportunity_score)}
+        </span>
+
+        <div style={{display:'flex',alignItems:'center',gap:12,margin:'16px 0'}}>
+          <div style={{fontSize:48,fontWeight:800,color:scoreColor(opp.opportunity_score)}}>
+            {Math.round(opp.opportunity_score)}
+          </div>
+          <div style={{flex:1}}>
+            <div className="breakdown">
+              {opp.score_breakdown && Object.entries(opp.score_breakdown).map(([k, v]) => (
+                <span key={k} className="breakdown-item">{k}: {v}점</span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {opp.strategy_comment && (
+          <div style={{background:'#f8f9fa',padding:12,borderRadius:8,marginBottom:16}}>
+            <div style={{fontSize:12,fontWeight:700,color:'#666',marginBottom:4}}>📋 전략 코멘트</div>
+            <div style={{fontSize:13,lineHeight:1.5}}>{opp.strategy_comment}</div>
+          </div>
+        )}
+
+        <div className="grid-2" style={{marginBottom:16}}>
+          <div style={{padding:10,background:'#e3f2fd',borderRadius:8,textAlign:'center'}}>
+            <div style={{fontSize:11,color:'#1565c0'}}>IG 주간 성장</div>
+            <div style={{fontSize:20,fontWeight:800,color:'#1565c0'}}>
+              {opp.instagram_weekly_growth > 0 ? '+' : ''}{(opp.instagram_weekly_growth || 0).toFixed(1)}%
+            </div>
+          </div>
+          <div style={{padding:10,background: (opp.google_growth_rate||0) >= 0 ? '#e8f5e9' : '#fce4ec',borderRadius:8,textAlign:'center'}}>
+            <div style={{fontSize:11,color: (opp.google_growth_rate||0) >= 0 ? '#2e7d32' : '#c62828'}}>Google 성장률</div>
+            <div style={{fontSize:20,fontWeight:800,color: (opp.google_growth_rate||0) >= 0 ? '#2e7d32' : '#c62828'}}>
+              {(opp.google_growth_rate||0) >= 0 ? '+' : ''}{(opp.google_growth_rate || 0).toFixed(1)}%
+            </div>
+          </div>
+        </div>
+
+        {origin && (
+          <div style={{background:'#fffde7',padding:12,borderRadius:8,marginBottom:16}}>
+            <div style={{fontSize:12,fontWeight:700,color:'#f57f17',marginBottom:4}}>⚡ 골든타임</div>
+            <div style={{fontSize:13}}>
+              최초 언급: <b>{origin.first_podcast_influencer}</b> ({origin.first_podcast_date})
+              {origin.golden_time_end
+                ? ` → 종료 (${origin.golden_time_duration_days}일)`
+                : ` → 진행 중 (${Math.floor((Date.now() - new Date(origin.golden_time_start).getTime()) / 86400000)}일째)`
+              }
+            </div>
+            {origin.analysis_report && <div style={{fontSize:12,marginTop:6,color:'#666'}}>{origin.analysis_report}</div>}
+          </div>
+        )}
+
+        {kwPodcasts.length > 0 && (
+          <div>
+            <div style={{fontSize:12,fontWeight:700,color:'#666',marginBottom:8}}>🎙️ 팟캐스트 언급 ({kwPodcasts.length})</div>
+            {kwPodcasts.map((p, i) => (
+              <div key={i} className="podcast-item">
+                <div className="podcast-meta">
+                  <span className={`influencer-tag tag-${p.influencer || 'default'}`}>
+                    {(p.influencer || '').toUpperCase()}
+                  </span>
+                  <span style={{fontSize:11,color:'#999'}}>{p.mentioned_date}</span>
+                </div>
+                {p.mention_quote && <div className="podcast-quote">"{p.mention_quote}"</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── 유틸 ──
+function scoreColor(score) {
+  if (score >= 80) return '#2e7d32';
+  if (score >= 60) return '#f57f17';
+  return '#c62828';
+}
+
+function verdictClass(score) {
+  if (score >= 80) return 'verdict-green';
+  if (score >= 60) return 'verdict-yellow';
+  return 'verdict-red';
+}
+
+function verdictText(score) {
+  if (score >= 80) return '🟢 지금 진입';
+  if (score >= 60) return '🟡 6개월 내 검토';
+  return '🔴 포화 시장';
+}
+
+function contextLabel(ctx) {
+  const map = {
+    benefit_explanation: '효능 설명',
+    personal_use: '본인 사용',
+    brand_recommendation: '브랜드 추천',
+    other: '기타',
+  };
+  return map[ctx] || ctx;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

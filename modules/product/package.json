@@ -4,11 +4,15 @@
   "type": "module",
   "scripts": {
     "start": "npx tsx src/agent.ts",
-    "dev": "npx tsx watch src/agent.ts"
+    "dev": "npx tsx watch src/agent.ts",
+    "dashboard": "node server.js",
+    "dashboard:dev": "node --watch server.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@supabase/supabase-js": "^2.39.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
     "google-trends-api": "^4.9.2",
     "node-cron": "^3.0.3",
     "node-fetch": "^3.3.2"
