@@ -65,6 +65,7 @@ export interface OpportunityScore {
 export interface InfluencerConfig {
   name: string;
   taddy_uuid: string;
+  podcast_search_name: string;
   ig_handle: string;
   keywords_focus: string[];
 }

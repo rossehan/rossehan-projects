@@ -6,46 +6,80 @@ import {
   getEpisodesWithTranscripts,
   extractKeywordContext,
   extractSupplementKeywords,
+  searchPodcastSeries,
 } from '../services/taddy.js';
 
 export const INFLUENCERS: Record<string, InfluencerConfig> = {
   huberman: {
     name: 'Andrew Huberman',
-    taddy_uuid: 'TODO',
+    taddy_uuid: '',
+    podcast_search_name: 'Huberman Lab',
     ig_handle: 'hubermanlab',
     keywords_focus: ['nmn', 'tongkat ali', 'apigenin', 'magnesium', 'alpha-gpc', 'fadogia'],
   },
   sinclair: {
     name: 'David Sinclair',
-    taddy_uuid: 'TODO',
+    taddy_uuid: '',
+    podcast_search_name: 'Lifespan David Sinclair',
     ig_handle: 'davidsinclairphd',
     keywords_focus: ['nmn', 'resveratrol', 'spermidine', 'fisetin', 'berberine', 'taurine'],
   },
   attia: {
     name: 'Peter Attia',
-    taddy_uuid: 'TODO',
+    taddy_uuid: '',
+    podcast_search_name: 'The Drive Peter Attia',
     ig_handle: 'peterattiamd',
     keywords_focus: ['omega3', 'rapamycin', 'berberine', 'glycine', 'ashwagandha', 'creatine'],
   },
   brecka: {
     name: 'Gary Brecka',
-    taddy_uuid: 'TODO',
+    taddy_uuid: '',
+    podcast_search_name: 'Ultimate Human Gary Brecka',
     ig_handle: 'garybrecka',
     keywords_focus: ['methyl folate', 'spermidine', 'mthfr', 'methylated b12', 'methylation'],
   },
   hyman: {
     name: 'Mark Hyman',
-    taddy_uuid: 'TODO',
+    taddy_uuid: '',
+    podcast_search_name: 'The Doctor\'s Farmacy Mark Hyman',
     ig_handle: 'drmarkhyman',
     keywords_focus: ['probiotics', 'glutathione', 'coq10', 'nac', 'curcumin', 'digestive enzymes'],
   },
   patrick: {
     name: 'Rhonda Patrick',
-    taddy_uuid: 'TODO',
+    taddy_uuid: '',
+    podcast_search_name: 'FoundMyFitness Rhonda Patrick',
     ig_handle: 'foundmyfitness',
     keywords_focus: ['sulforaphane', 'omega3', 'vitamin d', "lion's mane", 'magnesium', 'sauna'],
   },
 };
+
+// Taddy에서 팟캐스트 UUID 자동 검색 & 캐싱
+export async function resolveInfluencerUUIDs(
+  reportProgress?: (msg: string) => void,
+): Promise<Record<string, string>> {
+  const resolved: Record<string, string> = {};
+
+  for (const [key, config] of Object.entries(INFLUENCERS)) {
+    if (config.taddy_uuid) {
+      resolved[key] = config.taddy_uuid;
+      continue;
+    }
+
+    reportProgress?.(`[resolve-uuid] ${config.name} 팟캐스트 검색 중: "${config.podcast_search_name}"`);
+
+    const results = await searchPodcastSeries(config.podcast_search_name, 3);
+    if (results.length > 0) {
+      config.taddy_uuid = results[0].uuid;
+      resolved[key] = results[0].uuid;
+      reportProgress?.(`[resolve-uuid] ✅ ${config.name} → ${results[0].name} (${results[0].uuid})`);
+    } else {
+      reportProgress?.(`[resolve-uuid] ❌ ${config.name} — 검색 결과 없음`);
+    }
+  }
+
+  return resolved;
+}
 
 interface ScanParams {
   influencer: string;
@@ -78,6 +112,18 @@ export async function scanPodcastKeywords(
 
   const daysBack = params.days_back ?? 30;
   const useTranscript = params.use_transcript ?? true;
+
+  // UUID 미설정 시 자동 검색
+  if (!config.taddy_uuid) {
+    ctx.reportProgress(`[scan-podcast] ${config.name} UUID 미설정 → 자동 검색 중...`);
+    const results = await searchPodcastSeries(config.podcast_search_name, 3);
+    if (results.length > 0) {
+      config.taddy_uuid = results[0].uuid;
+      ctx.reportProgress(`[scan-podcast] ✅ ${config.name} → ${results[0].name} (${results[0].uuid})`);
+    } else {
+      throw new Error(`${config.name} 팟캐스트를 Taddy에서 찾을 수 없습니다.`);
+    }
+  }
 
   ctx.reportProgress(`[scan-podcast] ${config.name} 최근 에피소드 조회 중...`);
 

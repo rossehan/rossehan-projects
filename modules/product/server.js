@@ -191,6 +191,234 @@ app.get('/api/ads', async (req, res) => {
   return res.json([]);
 });
 
+// ── 에이전트 기능 (LIVE 모드 전용) ─────────────────────
+
+// 스캔 상태 추적
+let scanStatus = { running: false, step: '', progress: [], startedAt: null, completedAt: null, result: null, error: null };
+
+// DB 테이블 자동 생성
+app.post('/api/setup-db', async (req, res) => {
+  if (!isLive) return res.status(400).json({ error: 'LIVE 모드에서만 사용 가능' });
+
+  const tables = [
+    `CREATE TABLE IF NOT EXISTS podcast_keywords (
+      id SERIAL PRIMARY KEY, influencer TEXT NOT NULL, keyword TEXT NOT NULL,
+      mentioned_date DATE NOT NULL, episode_title TEXT, episode_url TEXT, episode_id TEXT,
+      mention_timestamp_seconds INTEGER, mention_context TEXT, mention_quote TEXT,
+      created_at TIMESTAMP DEFAULT NOW(), UNIQUE(influencer, keyword, mentioned_date)
+    )`,
+    `CREATE TABLE IF NOT EXISTS instagram_snapshots (
+      id SERIAL PRIMARY KEY, keyword TEXT NOT NULL, hashtag TEXT NOT NULL,
+      post_count INTEGER, recent_post_count INTEGER, snapshot_date DATE NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(), UNIQUE(keyword, snapshot_date)
+    )`,
+    `CREATE TABLE IF NOT EXISTS facebook_ads_snapshots (
+      id SERIAL PRIMARY KEY, keyword TEXT NOT NULL, total_ads INTEGER,
+      unique_advertisers INTEGER, new_advertisers_this_week INTEGER,
+      oldest_ad_date DATE, newest_ad_date DATE, competition_level TEXT,
+      snapshot_date DATE NOT NULL, created_at TIMESTAMP DEFAULT NOW(), UNIQUE(keyword, snapshot_date)
+    )`,
+    `CREATE TABLE IF NOT EXISTS google_trends_snapshots (
+      id SERIAL PRIMARY KEY, keyword TEXT NOT NULL, current_3m_avg REAL, prev_3m_avg REAL,
+      growth_rate REAL, trend_direction TEXT, snapshot_date DATE NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(), UNIQUE(keyword, snapshot_date)
+    )`,
+    `CREATE TABLE IF NOT EXISTS opportunity_scores (
+      id SERIAL PRIMARY KEY, keyword TEXT NOT NULL, opportunity_score REAL, verdict TEXT,
+      score_breakdown JSONB, strategy_comment TEXT, podcast_mention_date DATE,
+      instagram_weekly_growth REAL, google_growth_rate REAL, facebook_advertiser_count INTEGER,
+      snapshot_date DATE NOT NULL, created_at TIMESTAMP DEFAULT NOW(), UNIQUE(keyword, snapshot_date)
+    )`,
+    `CREATE TABLE IF NOT EXISTS keyword_origins (
+      id SERIAL PRIMARY KEY, keyword TEXT NOT NULL UNIQUE,
+      first_podcast_date DATE, first_podcast_influencer TEXT, first_podcast_name TEXT,
+      first_podcast_episode_title TEXT, first_podcast_quote TEXT, first_podcast_timestamp_seconds INTEGER,
+      market_creator_date DATE, market_creator_influencer TEXT, market_creator_podcast_name TEXT,
+      market_creator_episode_title TEXT, market_creator_quote TEXT,
+      market_creator_ig_growth REAL, market_creator_google_growth REAL,
+      mention_timeline JSONB, spread_pattern JSONB,
+      golden_time_start DATE, golden_time_end DATE, golden_time_duration_days INTEGER,
+      avg_golden_time_days INTEGER, analysis_report TEXT,
+      analyzed_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW()
+    )`,
+  ];
+
+  const results = [];
+  for (const sql of tables) {
+    try {
+      const { error } = await supabase.rpc('exec_sql', { sql_query: sql }).catch(() => ({ error: null }));
+      // rpc가 없으면 직접 REST로 테이블 존재 확인
+      const tableName = sql.match(/CREATE TABLE IF NOT EXISTS (\w+)/)?.[1];
+      const { error: checkError } = await supabase.from(tableName).select('id').limit(1);
+      results.push({ table: tableName, status: checkError ? 'needs_manual_creation' : 'ok' });
+    } catch (err) {
+      results.push({ table: 'unknown', status: 'error', message: err.message });
+    }
+  }
+
+  res.json({ results, message: '테이블 상태 확인 완료. needs_manual_creation인 테이블은 Supabase SQL Editor에서 schema.sql을 실행해주세요.' });
+});
+
+// Taddy UUID 자동 검색
+app.post('/api/resolve-uuids', async (req, res) => {
+  if (!process.env.TADDY_API_KEY) {
+    return res.status(400).json({ error: 'TADDY_API_KEY 미설정' });
+  }
+
+  try {
+    const TADDY_GRAPHQL_URL = 'https://api.taddy.org';
+    const influencers = {
+      huberman: 'Huberman Lab',
+      sinclair: 'Lifespan David Sinclair',
+      attia: 'The Drive Peter Attia',
+      brecka: 'Ultimate Human Gary Brecka',
+      hyman: 'The Doctor\'s Farmacy Mark Hyman',
+      patrick: 'FoundMyFitness Rhonda Patrick',
+    };
+
+    const results = {};
+    for (const [key, searchName] of Object.entries(influencers)) {
+      try {
+        const query = `{ search(term: "${searchName}", filterForTypes: PODCASTSERIES, limitPerPage: 3) { podcastSeries { uuid name description } } }`;
+        const response = await fetch(TADDY_GRAPHQL_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-KEY': process.env.TADDY_API_KEY,
+            'X-USER-ID': process.env.TADDY_USER_ID || '',
+          },
+          body: JSON.stringify({ query }),
+        });
+        const data = await response.json();
+        const podcasts = data?.data?.search?.podcastSeries ?? [];
+        results[key] = podcasts.map(p => ({ uuid: p.uuid, name: p.name }));
+      } catch (err) {
+        results[key] = { error: err.message };
+      }
+    }
+
+    res.json({ results });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Google Trends 단일 키워드 조회 (실시간)
+app.get('/api/trends-live/:keyword', async (req, res) => {
+  try {
+    const googleTrends = await import('google-trends-api');
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    const result = await googleTrends.default.interestOverTime({
+      keyword: req.params.keyword,
+      startTime: sixMonthsAgo,
+      geo: 'US',
+    });
+    const data = JSON.parse(result);
+
+    // 3개월 성장률 계산
+    const timeline = data?.default?.timelineData ?? [];
+    const midIdx = Math.floor(timeline.length / 2);
+    const recent = timeline.slice(midIdx);
+    const prev = timeline.slice(0, midIdx);
+    const recentAvg = recent.length > 0 ? recent.reduce((s, d) => s + (d.value?.[0] ?? 0), 0) / recent.length : 0;
+    const prevAvg = prev.length > 0 ? prev.reduce((s, d) => s + (d.value?.[0] ?? 0), 0) / prev.length : 0;
+    const growthRate = prevAvg > 0 ? ((recentAvg - prevAvg) / prevAvg * 100) : 0;
+
+    res.json({
+      keyword: req.params.keyword,
+      current_3m_avg: Math.round(recentAvg * 100) / 100,
+      prev_3m_avg: Math.round(prevAvg * 100) / 100,
+      growth_rate: Math.round(growthRate * 100) / 100,
+      trend_direction: growthRate > 10 ? 'rising' : growthRate < -10 ? 'falling' : 'stable',
+      timeline: timeline.map(d => ({ date: d.formattedTime, value: d.value?.[0] ?? 0 })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 전체 스캔 실행 (수동 트리거)
+app.post('/api/scan', async (req, res) => {
+  if (scanStatus.running) {
+    return res.status(409).json({ error: '스캔이 이미 진행 중입니다', status: scanStatus });
+  }
+
+  if (!isLive) {
+    return res.status(400).json({ error: 'LIVE 모드에서만 스캔 가능 (SUPABASE 연결 필요)' });
+  }
+
+  // 필요한 API 키 확인
+  const missingKeys = [];
+  if (!process.env.TADDY_API_KEY) missingKeys.push('TADDY_API_KEY');
+  if (!process.env.ANTHROPIC_API_KEY) missingKeys.push('ANTHROPIC_API_KEY');
+  if (missingKeys.length > 0) {
+    return res.status(400).json({ error: `필수 API 키 누락: ${missingKeys.join(', ')}` });
+  }
+
+  const { influencers = ['huberman', 'sinclair', 'attia', 'brecka'], days_back = 30 } = req.body || {};
+
+  scanStatus = { running: true, step: '초기화', progress: [], startedAt: new Date().toISOString(), completedAt: null, result: null, error: null };
+
+  // 비동기로 스캔 실행 (응답은 즉시 반환)
+  res.json({ message: '스캔 시작됨', status: scanStatus });
+
+  // 백그라운드에서 스캔 실행
+  (async () => {
+    try {
+      // Dynamic import for ESM TypeScript modules
+      const { runFullScan } = await import('./src/capabilities/run-full-scan.js');
+
+      const ctx = {
+        supabase,
+        reportProgress: (msg) => {
+          scanStatus.step = msg;
+          scanStatus.progress.push({ time: new Date().toISOString(), message: msg });
+          console.log(msg);
+        },
+      };
+
+      const reportEvent = async (event) => {
+        console.log(`[TrendRadar] 이벤트: [${event.urgency}] ${event.event_type} — ${event.summary}`);
+        try {
+          await supabase.from('agent_events').insert({
+            agent_id: 'trendradar-agent',
+            module: 'product',
+            event_type: event.event_type,
+            summary: event.summary,
+            metrics: event.metrics,
+            urgency: event.urgency,
+            created_at: new Date().toISOString(),
+          });
+        } catch (err) {
+          // agent_events 테이블 없으면 무시
+        }
+      };
+
+      scanStatus.step = '전체 스캔 실행 중';
+      const result = await runFullScan({ influencers, days_back }, ctx, reportEvent);
+
+      scanStatus.running = false;
+      scanStatus.completedAt = new Date().toISOString();
+      scanStatus.result = result;
+      scanStatus.step = '완료';
+      console.log('[TrendRadar] 수동 스캔 완료:', JSON.stringify(result));
+    } catch (err) {
+      scanStatus.running = false;
+      scanStatus.completedAt = new Date().toISOString();
+      scanStatus.error = err.message;
+      scanStatus.step = '실패';
+      console.error('[TrendRadar] 수동 스캔 실패:', err.message);
+    }
+  })();
+});
+
+// 스캔 상태 확인
+app.get('/api/scan/status', (req, res) => {
+  res.json(scanStatus);
+});
+
 // 서버 시작
 app.listen(PORT, () => {
   console.log(`[TrendRadar] 대시보드: http://localhost:${PORT}`);

@@ -111,6 +111,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .stat-num.blue { color: #1565c0; }
 .stat-label { font-size: 12px; color: #888; margin-top: 4px; }
 
+/* Agent panel */
+.agent-btn { padding: 10px 20px; border-radius: 8px; border: none; font-size: 14px; font-weight: 700; cursor: pointer; transition: all .2s; display: inline-flex; align-items: center; gap: 6px; }
+.agent-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.agent-btn-primary { background: #302b63; color: #fff; }
+.agent-btn-primary:hover:not(:disabled) { background: #1a1650; }
+.agent-btn-secondary { background: #e8e8e8; color: #333; }
+.agent-btn-secondary:hover:not(:disabled) { background: #d0d0d0; }
+.agent-btn-danger { background: #c62828; color: #fff; }
+.agent-log { background: #1a1a2e; color: #00e676; font-family: 'Courier New', monospace; font-size: 12px; padding: 16px; border-radius: 8px; max-height: 400px; overflow-y: auto; line-height: 1.6; white-space: pre-wrap; }
+.agent-log .log-time { color: #666; }
+.agent-log .log-warn { color: #ffd600; }
+.agent-log .log-error { color: #ff5252; }
+.agent-log .log-success { color: #00e676; }
+.uuid-result { padding: 8px 12px; margin: 4px 0; background: #f8f9fa; border-radius: 6px; font-size: 13px; display: flex; justify-content: space-between; }
+.uuid-result .uuid-name { font-weight: 700; }
+.uuid-result .uuid-id { font-family: monospace; color: #666; font-size: 12px; }
+.scan-progress { padding: 12px 16px; background: #e3f2fd; border-radius: 8px; margin-top: 12px; }
+.scan-progress .step-name { font-weight: 700; color: #1565c0; }
+
 /* Loading */
 .loading { text-align: center; padding: 40px; color: #999; }
 .spinner { display: inline-block; width: 32px; height: 32px; border: 3px solid #e0e0e0; border-top-color: #302b63; border-radius: 50%; animation: spin 0.8s linear infinite; }
@@ -192,6 +211,9 @@ function App() {
         <div className={`tab ${tab === 'podcast' ? 'active' : ''}`} onClick={() => setTab('podcast')}>
           🎙️ 팟캐스트
         </div>
+        <div className={`tab ${tab === 'agent' ? 'active' : ''}`} onClick={() => setTab('agent')}>
+          🤖 에이전트
+        </div>
       </div>
 
       <div className="container">
@@ -203,6 +225,7 @@ function App() {
             {tab === 'golden' && <GoldenTab origins={origins} />}
             {tab === 'signals' && <SignalsTab trends={trends} opportunities={opportunities} />}
             {tab === 'podcast' && <PodcastTab podcasts={podcasts} />}
+            {tab === 'agent' && <AgentTab mode={mode} onScanComplete={fetchAll} />}
           </>
         )}
       </div>
@@ -476,6 +499,190 @@ function PodcastTab({ podcasts }) {
         </div>
       ))}
     </div>
+  );
+}
+
+// ── 에이전트 관리 ──
+function AgentTab({ mode, onScanComplete }) {
+  const [scanStatus, setScanStatus] = useState(null);
+  const [uuids, setUuids] = useState(null);
+  const [dbStatus, setDbStatus] = useState(null);
+  const [scanRunning, setScanRunning] = useState(false);
+  const [logs, setLogs] = useState([]);
+  const [pollId, setPollId] = useState(null);
+
+  const addLog = (msg, type = 'info') => {
+    const time = new Date().toLocaleTimeString('ko-KR');
+    setLogs(prev => [...prev, { time, msg, type }]);
+  };
+
+  // UUID 검색
+  const resolveUUIDs = async () => {
+    addLog('Taddy 팟캐스트 UUID 검색 시작...');
+    try {
+      const res = await fetch('/api/resolve-uuids', { method: 'POST' });
+      const data = await res.json();
+      if (data.error) {
+        addLog(`오류: ${data.error}`, 'error');
+        return;
+      }
+      setUuids(data.results);
+      for (const [key, podcasts] of Object.entries(data.results)) {
+        if (Array.isArray(podcasts) && podcasts.length > 0) {
+          addLog(`✅ ${key}: ${podcasts[0].name} (${podcasts[0].uuid})`, 'success');
+        } else {
+          addLog(`❌ ${key}: 검색 결과 없음`, 'warn');
+        }
+      }
+    } catch (err) {
+      addLog(`UUID 검색 실패: ${err.message}`, 'error');
+    }
+  };
+
+  // DB 테이블 확인
+  const setupDB = async () => {
+    addLog('Supabase 테이블 상태 확인 중...');
+    try {
+      const res = await fetch('/api/setup-db', { method: 'POST' });
+      const data = await res.json();
+      setDbStatus(data);
+      for (const r of (data.results || [])) {
+        const icon = r.status === 'ok' ? '✅' : '⚠️';
+        addLog(`${icon} ${r.table}: ${r.status}`, r.status === 'ok' ? 'success' : 'warn');
+      }
+      if (data.message) addLog(data.message);
+    } catch (err) {
+      addLog(`DB 확인 실패: ${err.message}`, 'error');
+    }
+  };
+
+  // 스캔 실행
+  const startScan = async () => {
+    if (mode !== 'live') {
+      addLog('⚠️ LIVE 모드에서만 스캔 가능 (Supabase 연결 필요)', 'warn');
+      return;
+    }
+    setScanRunning(true);
+    addLog('🚀 전체 스캔 시작!');
+    try {
+      const res = await fetch('/api/scan', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ influencers: ['huberman', 'sinclair', 'attia', 'brecka'], days_back: 30 }) });
+      const data = await res.json();
+      if (data.error) {
+        addLog(`오류: ${data.error}`, 'error');
+        setScanRunning(false);
+        return;
+      }
+      addLog('스캔 프로세스 시작됨. 진행상황 모니터링 중...');
+      // 2초마다 폴링
+      const id = setInterval(async () => {
+        try {
+          const statusRes = await fetch('/api/scan/status');
+          const status = await statusRes.json();
+          setScanStatus(status);
+          if (status.step) {
+            addLog(`📋 ${status.step}`);
+          }
+          if (!status.running) {
+            clearInterval(id);
+            setScanRunning(false);
+            if (status.error) {
+              addLog(`❌ 스캔 실패: ${status.error}`, 'error');
+            } else {
+              addLog(`✅ 스캔 완료! 총 ${status.result?.total_keywords || 0}개 키워드, ${status.result?.high_opportunity_keywords?.length || 0}개 고기회 발견`, 'success');
+              onScanComplete();
+            }
+          }
+        } catch (err) {
+          // 폴링 에러 무시
+        }
+      }, 3000);
+      setPollId(id);
+    } catch (err) {
+      addLog(`스캔 시작 실패: ${err.message}`, 'error');
+      setScanRunning(false);
+    }
+  };
+
+  // 클린업
+  useEffect(() => { return () => { if (pollId) clearInterval(pollId); }; }, [pollId]);
+
+  return (
+    <>
+      <div className="card">
+        <div className="card-title">🤖 TrendRadar 에이전트 관리</div>
+        <p style={{fontSize:13,color:'#666',marginBottom:16}}>
+          팟캐스트 키워드 스캔 → Instagram/Google Trends/Facebook Ads 시그널 측정 → 기회 점수 분석 파이프라인
+        </p>
+
+        <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:16}}>
+          <button className="agent-btn agent-btn-primary" onClick={startScan} disabled={scanRunning}>
+            {scanRunning ? <><span className="spinner" style={{width:16,height:16,borderWidth:2}}></span> 스캔 진행 중...</> : '🚀 전체 스캔 실행'}
+          </button>
+          <button className="agent-btn agent-btn-secondary" onClick={resolveUUIDs}>
+            🔍 팟캐스트 UUID 검색
+          </button>
+          <button className="agent-btn agent-btn-secondary" onClick={setupDB}>
+            🗄️ DB 테이블 확인
+          </button>
+        </div>
+
+        {scanRunning && scanStatus && (
+          <div className="scan-progress">
+            <span className="step-name">현재 단계:</span> {scanStatus.step || '대기 중...'}
+            {scanStatus.progress && scanStatus.progress.length > 0 && (
+              <div style={{fontSize:11,color:'#666',marginTop:4}}>
+                진행: {scanStatus.progress.length}개 작업 완료
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {uuids && (
+        <div className="card">
+          <div className="card-title">🔍 팟캐스트 UUID 검색 결과</div>
+          {Object.entries(uuids).map(([key, podcasts]) => (
+            <div key={key}>
+              <div style={{fontSize:12,fontWeight:700,color:'#666',marginTop:8,textTransform:'capitalize'}}>{key}</div>
+              {Array.isArray(podcasts) ? podcasts.map((p, i) => (
+                <div key={i} className="uuid-result">
+                  <span className="uuid-name">{p.name}</span>
+                  <span className="uuid-id">{p.uuid}</span>
+                </div>
+              )) : (
+                <div style={{fontSize:12,color:'#c62828',padding:4}}>오류: {podcasts?.error || '검색 실패'}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="card">
+        <div className="card-title">📟 에이전트 로그</div>
+        <div className="agent-log">
+          {logs.length === 0 && <span style={{color:'#555'}}>아직 로그 없음. 위 버튼으로 작업을 시작하세요.</span>}
+          {logs.map((l, i) => (
+            <div key={i}>
+              <span className="log-time">[{l.time}]</span>{' '}
+              <span className={`log-${l.type}`}>{l.msg}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-title">📖 파이프라인 설명</div>
+        <div style={{fontSize:13,lineHeight:1.8,color:'#555'}}>
+          <b>Step 1.</b> 팟캐스트 키워드 스캔 — Taddy API로 Huberman/Attia/Sinclair/Brecka 에피소드 조회 → Claude가 서플리먼트 키워드 추출<br/>
+          <b>Step 2.</b> Instagram 시그널 — 추출된 키워드의 해시태그 포스트 수 측정 (주간 성장률)<br/>
+          <b>Step 3.</b> Facebook Ads 시그널 — Ad Library에서 키워드 광고 수 + 광고주 수 조회 (경쟁도)<br/>
+          <b>Step 4.</b> Google Trends 시그널 — 6개월 검색 트렌드 + 3개월 성장률<br/>
+          <b>Step 5.</b> 기회 분석 — 4가지 시그널 종합 → 0-100 점수 + AI 전략 코멘트 생성<br/>
+          <br/>
+          <b>자동 스케줄:</b> 매일 07:00 KST 전체 스캔 / 09:00 KST 골든타임 모니터링
+        </div>
+      </div>
+    </>
   );
 }
 

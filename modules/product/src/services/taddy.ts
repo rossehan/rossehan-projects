@@ -37,6 +37,35 @@ async function taddyQuery(query: string, variables?: object): Promise<any> {
   return response.json();
 }
 
+export async function searchPodcastSeries(
+  term: string,
+  limit: number = 5,
+): Promise<Array<{ uuid: string; name: string; description: string | null }>> {
+  const query = `
+    {
+      search(
+        term: "${term}"
+        filterForTypes: PODCASTSERIES
+        limitPerPage: ${limit}
+      ) {
+        podcastSeries {
+          uuid
+          name
+          description
+        }
+      }
+    }
+  `;
+
+  try {
+    const result = await taddyQuery(query);
+    return result?.data?.search?.podcastSeries ?? [];
+  } catch (err) {
+    console.error(`[TrendRadar] Taddy podcast search 실패 (${term}):`, (err as Error).message);
+    return [];
+  }
+}
+
 export async function getEpisodesWithTranscripts(
   podcastUuid: string,
   limit: number = 10,
