@@ -15,7 +15,12 @@ const GRAPH_API_BASE = 'https://graph.facebook.com/v22.0';
 const THREADS_API_BASE = 'https://graph.threads.net/v1.0';
 
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
-const toDateStr = (d) => (typeof d === 'string' ? d : d.toISOString()).split('T')[0];
+const toDateStr = (d) => {
+  if (!d) return new Date().toISOString().split('T')[0];
+  if (typeof d === 'string') return d.split('T')[0];
+  if (typeof d === 'number') return new Date(d < 1e12 ? d * 1000 : d).toISOString().split('T')[0];
+  return d.toISOString().split('T')[0];
+};
 const log = (tag, msg) => console.log(`[${new Date().toLocaleTimeString('ko-KR')}] [${tag}] ${msg}`);
 
 // ── 인플루언서 목록 ──
