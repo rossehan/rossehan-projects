@@ -94,7 +94,7 @@ app.get('/api/opportunities', async (req, res) => {
         .order('opportunity_score', { ascending: false })
         .limit(50);
       if (error) throw error;
-      return res.json(data || []);
+      if (data && data.length > 0) return res.json(data);
     } catch (err) {
       console.error('[API] opportunities error:', err.message);
     }
@@ -112,7 +112,7 @@ app.get('/api/origins', async (req, res) => {
         .order('analyzed_at', { ascending: false })
         .limit(30);
       if (error) throw error;
-      return res.json(data || []);
+      if (data && data.length > 0) return res.json(data);
     } catch (err) {
       console.error('[API] origins error:', err.message);
     }
@@ -130,7 +130,7 @@ app.get('/api/podcasts', async (req, res) => {
         .order('mentioned_date', { ascending: false })
         .limit(100);
       if (error) throw error;
-      return res.json(data || []);
+      if (data && data.length > 0) return res.json(data);
     } catch (err) {
       console.error('[API] podcasts error:', err.message);
     }
@@ -148,7 +148,7 @@ app.get('/api/trends', async (req, res) => {
         .order('snapshot_date', { ascending: false })
         .limit(50);
       if (error) throw error;
-      return res.json(data || []);
+      if (data && data.length > 0) return res.json(data);
     } catch (err) {
       console.error('[API] trends error:', err.message);
     }
@@ -166,7 +166,7 @@ app.get('/api/ads', async (req, res) => {
         .order('snapshot_date', { ascending: false })
         .limit(50);
       if (error) throw error;
-      return res.json(data || []);
+      if (data && data.length > 0) return res.json(data);
     } catch (err) {
       console.error('[API] ads error:', err.message);
     }
