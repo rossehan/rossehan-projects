@@ -510,6 +510,12 @@ app.post('/api/setup-db', async (req, res) => {
       avg_golden_time_days INTEGER, analysis_report TEXT,
       analyzed_at TIMESTAMP DEFAULT NOW(), updated_at TIMESTAMP DEFAULT NOW()
     )`,
+    `CREATE TABLE IF NOT EXISTS social_mentions (
+      id SERIAL PRIMARY KEY, platform TEXT NOT NULL, influencer TEXT,
+      keyword TEXT NOT NULL, post_date DATE NOT NULL, post_text TEXT,
+      post_url TEXT, post_id TEXT, engagement_count INTEGER,
+      created_at TIMESTAMP DEFAULT NOW(), UNIQUE(platform, keyword, post_id)
+    )`,
   ];
 
   const results = [];

@@ -119,3 +119,21 @@ CREATE TABLE IF NOT EXISTS keyword_origins (
 ALTER TABLE keyword_origins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE keyword_origins FORCE ROW LEVEL SECURITY;
 CREATE POLICY "service_role_all" ON keyword_origins FOR ALL USING (true) WITH CHECK (true);
+
+-- Threads / 소셜미디어 키워드 언급 기록
+CREATE TABLE IF NOT EXISTS social_mentions (
+  id SERIAL PRIMARY KEY,
+  platform TEXT NOT NULL,  -- 'threads', 'instagram_post', 'facebook_post'
+  influencer TEXT,
+  keyword TEXT NOT NULL,
+  post_date DATE NOT NULL,
+  post_text TEXT,
+  post_url TEXT,
+  post_id TEXT,
+  engagement_count INTEGER,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(platform, keyword, post_id)
+);
+ALTER TABLE social_mentions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE social_mentions FORCE ROW LEVEL SECURITY;
+CREATE POLICY "service_role_all" ON social_mentions FOR ALL USING (true) WITH CHECK (true);

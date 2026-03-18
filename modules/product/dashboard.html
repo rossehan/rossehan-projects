@@ -624,6 +624,20 @@ function AgentTab({ mode, onScanComplete }) {
           <button className="agent-btn agent-btn-secondary" onClick={setupDB}>
             🗄️ DB 테이블 확인
           </button>
+          <button className="agent-btn agent-btn-secondary" onClick={async () => {
+            addLog('📦 Supabase에 히스토리컬 시드 데이터 삽입 시작...');
+            try {
+              const res = await fetch('/api/seed', { method: 'POST' });
+              const data = await res.json();
+              if (data.error) { addLog(`❌ ${data.error}`, 'error'); return; }
+              const r = data.results;
+              addLog(`✅ 시드 완료! 팟캐스트: ${r.podcast_keywords}, 기회점수: ${r.opportunity_scores}, 트렌드: ${r.google_trends}, IG: ${r.instagram}, FB: ${r.facebook_ads}, 골든타임: ${r.keyword_origins}`, 'success');
+              if (r.errors?.length > 0) addLog(`⚠️ 에러 ${r.errors.length}건: ${r.errors[0]}`, 'warn');
+              onScanComplete();
+            } catch (err) { addLog(`❌ 시드 실패: ${err.message}`, 'error'); }
+          }}>
+            📦 시드 데이터 삽입
+          </button>
         </div>
 
         {scanRunning && scanStatus && (

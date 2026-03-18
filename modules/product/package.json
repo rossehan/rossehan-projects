@@ -6,7 +6,15 @@
     "start": "npx tsx src/agent.ts",
     "dev": "npx tsx watch src/agent.ts",
     "dashboard": "node server.js",
-    "dashboard:dev": "node --watch server.js"
+    "dashboard:dev": "node --watch server.js",
+    "collect": "node collect.js all",
+    "collect:podcasts": "node collect.js podcasts",
+    "collect:instagram": "node collect.js instagram",
+    "collect:facebook": "node collect.js facebook",
+    "collect:google": "node collect.js google",
+    "collect:threads": "node collect.js threads",
+    "collect:analyze": "node collect.js analyze",
+    "collect:seed": "node collect.js seed"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
