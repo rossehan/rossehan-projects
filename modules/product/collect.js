@@ -101,10 +101,9 @@ async function collectAllPodcastEpisodes() {
       try {
         const result = await taddyQuery(`{
           getPodcastSeries(uuid: "${inf.uuid}") {
+            uuid
             episodes(limitPerPage: 25, page: ${page}) {
               uuid name datePublished audioUrl description
-              taddyTranscribeStatus transcript
-              transcriptWithSpeakersAndTimecodes { text startTime }
             }
           }
         }`);
