@@ -24,7 +24,7 @@ const INFLUENCERS = {
   sinclair:  { name: 'David Sinclair', searchName: 'Lifespan David Sinclair', uuid: null, igHandle: 'davidsinclairphd', threadsHandle: 'davidsinclairphd' },
   attia:     { name: 'Peter Attia', searchName: 'The Drive Peter Attia', uuid: null, igHandle: 'peterattiamd', threadsHandle: 'peterattiamd' },
   brecka:    { name: 'Gary Brecka', searchName: 'Ultimate Human Gary Brecka', uuid: null, igHandle: 'garybrecka', threadsHandle: 'garybrecka' },
-  hyman:     { name: 'Mark Hyman', searchName: "The Doctor's Farmacy Mark Hyman", uuid: null, igHandle: 'drmarkhyman', threadsHandle: 'drmarkhyman' },
+  hyman:     { name: 'Mark Hyman', searchName: 'Doctors Farmacy Mark Hyman', uuid: null, igHandle: 'drmarkhyman', threadsHandle: 'drmarkhyman' },
   patrick:   { name: 'Rhonda Patrick', searchName: 'FoundMyFitness Rhonda Patrick', uuid: null, igHandle: 'foundmyfitness', threadsHandle: 'foundmyfitness' },
 };
 
@@ -50,11 +50,14 @@ async function taddyQuery(query) {
     headers: {
       'Content-Type': 'application/json',
       'X-API-KEY': process.env.TADDY_API_KEY,
-      'X-USER-ID': process.env.TADDY_USER_ID || '',
+      'X-USER-ID': String(process.env.TADDY_USER_ID || ''),
     },
     body: JSON.stringify({ query }),
   });
-  if (!response.ok) throw new Error(`Taddy ${response.status}: ${response.statusText}`);
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`Taddy ${response.status}: ${text.slice(0, 200)}`);
+  }
   return response.json();
 }
 
@@ -62,7 +65,8 @@ async function resolveAllUUIDs() {
   log('PODCAST', '인플루언서 팟캐스트 UUID 검색 시작...');
   for (const [key, inf] of Object.entries(INFLUENCERS)) {
     try {
-      const result = await taddyQuery(`{ search(term: "${inf.searchName}", filterForTypes: PODCASTSERIES, limitPerPage: 3) { podcastSeries { uuid name } } }`);
+      const safeName = inf.searchName.replace(/"/g, '\\"');
+      const result = await taddyQuery(`{ search(term: "${safeName}", filterForTypes: PODCASTSERIES, limitPerPage: 3) { podcastSeries { uuid name } } }`);
       const podcasts = result?.data?.search?.podcastSeries ?? [];
       if (podcasts.length > 0) {
         inf.uuid = podcasts[0].uuid;
