@@ -33,24 +33,213 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
 function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().split('T')[0]; }
 function weeksAgo(n) { return daysAgo(n * 7); }
 
-// 키워드별 히스토리컬 시뮬레이션 데이터
-const KEYWORD_PROFILES = {
-  shilajit:          { baseScore: 35, peakScore: 92, podcastDate: '2026-02-15', peakDate: '2026-03-10', igBase: 1200, igGrowthRate: 0.08, googleBase: 28, googlePeak: 78, fbAds: [2,3,3,5,6,8], influencer: 'huberman' },
-  'urolithin a':     { baseScore: 20, peakScore: 88, podcastDate: '2026-02-20', peakDate: '2026-03-12', igBase: 400, igGrowthRate: 0.12, googleBase: 12, googlePeak: 65, fbAds: [0,1,1,2,3,5], influencer: 'attia' },
-  'tongkat ali':     { baseScore: 45, peakScore: 85, podcastDate: '2025-11-10', peakDate: '2026-01-10', igBase: 3500, igGrowthRate: 0.06, googleBase: 35, googlePeak: 72, fbAds: [5,7,8,9,10,12], influencer: 'huberman' },
-  spermidine:        { baseScore: 25, peakScore: 82, podcastDate: '2026-01-20', peakDate: '2026-03-08', igBase: 800, igGrowthRate: 0.07, googleBase: 18, googlePeak: 45, fbAds: [1,2,3,4,6,9], influencer: 'sinclair' },
-  nmn:               { baseScore: 60, peakScore: 78, podcastDate: '2025-10-15', peakDate: '2025-12-01', igBase: 8000, igGrowthRate: 0.03, googleBase: 48, googlePeak: 68, fbAds: [22,25,28,30,33,35], influencer: 'sinclair' },
-  apigenin:          { baseScore: 40, peakScore: 74, podcastDate: '2025-12-10', peakDate: '2026-02-20', igBase: 2200, igGrowthRate: 0.04, googleBase: 22, googlePeak: 35, fbAds: [10,12,14,16,19,22], influencer: 'huberman' },
-  berberine:         { baseScore: 72, peakScore: 55, podcastDate: '2025-06-01', peakDate: '2025-09-01', igBase: 15000, igGrowthRate: 0.01, googleBase: 62, googlePeak: 52, fbAds: [55,62,68,75,82,89], influencer: 'attia' },
-  turkesterone:      { baseScore: 65, peakScore: 48, podcastDate: '2025-04-01', peakDate: '2025-07-01', igBase: 9500, igGrowthRate: -0.01, googleBase: 45, googlePeak: 25, fbAds: [45,50,55,58,62,67], influencer: 'huberman' },
-  'sea moss':        { baseScore: 50, peakScore: 63, podcastDate: '2025-11-20', peakDate: '2026-01-10', igBase: 12000, igGrowthRate: 0.02, googleBase: 48, googlePeak: 58, fbAds: [30,33,36,38,42,45], influencer: 'brecka' },
-  'fadogia agrestis':{ baseScore: 55, peakScore: 71, podcastDate: '2025-10-05', peakDate: '2026-01-25', igBase: 1800, igGrowthRate: 0.03, googleBase: 20, googlePeak: 30, fbAds: [15,18,20,22,25,28], influencer: 'huberman' },
-  'taurine':         { baseScore: 30, peakScore: 68, podcastDate: '2026-01-05', peakDate: '2026-02-15', igBase: 5500, igGrowthRate: 0.05, googleBase: 30, googlePeak: 48, fbAds: [8,10,12,14,16,18], influencer: 'sinclair' },
-  'creatine':        { baseScore: 70, peakScore: 65, podcastDate: '2025-09-01', peakDate: '2025-11-01', igBase: 25000, igGrowthRate: 0.01, googleBase: 72, googlePeak: 75, fbAds: [80,82,85,88,90,92], influencer: 'attia' },
-  'glutathione':     { baseScore: 35, peakScore: 72, podcastDate: '2026-02-01', peakDate: '2026-03-05', igBase: 3200, igGrowthRate: 0.06, googleBase: 25, googlePeak: 42, fbAds: [5,6,8,10,12,15], influencer: 'hyman' },
-  'sulforaphane':    { baseScore: 28, peakScore: 76, podcastDate: '2026-01-15', peakDate: '2026-03-01', igBase: 1600, igGrowthRate: 0.09, googleBase: 15, googlePeak: 38, fbAds: [3,4,5,7,9,11], influencer: 'patrick' },
-  'nac':             { baseScore: 45, peakScore: 70, podcastDate: '2025-11-01', peakDate: '2026-01-15', igBase: 4200, igGrowthRate: 0.03, googleBase: 32, googlePeak: 44, fbAds: [18,20,22,24,26,28], influencer: 'hyman' },
+// 카테고리 정의
+const CATEGORIES = {
+  longevity: { label: '장수/노화방지', color: '#6a1b9a' },
+  hormone: { label: '호르몬/남성건강', color: '#1565c0' },
+  sleep: { label: '수면/회복', color: '#283593' },
+  gut: { label: '장건강/소화', color: '#2e7d32' },
+  mental: { label: '멘탈/인지', color: '#e65100' },
+  skin: { label: '스킨케어/뷰티', color: '#ad1457' },
+  immune: { label: '면역/해독', color: '#00695c' },
+  energy: { label: '에너지/체력', color: '#bf360c' },
+  women: { label: '여성건강', color: '#880e4f' },
 };
+
+// 키워드별 히스토리컬 시뮬레이션 데이터 (40+ 키워드, 카테고리 포함)
+const KEYWORD_PROFILES = {
+  // ── 장수/노화방지 ──
+  shilajit:          { baseScore: 35, peakScore: 92, podcastDate: '2026-02-15', peakDate: '2026-03-10', igBase: 1200, igGrowthRate: 0.08, googleBase: 28, googlePeak: 78, fbAds: [2,3,3,5,6,8], influencer: 'huberman', category: 'longevity' },
+  'urolithin a':     { baseScore: 20, peakScore: 88, podcastDate: '2026-02-20', peakDate: '2026-03-12', igBase: 400, igGrowthRate: 0.12, googleBase: 12, googlePeak: 65, fbAds: [0,1,1,2,3,5], influencer: 'attia', category: 'longevity' },
+  spermidine:        { baseScore: 25, peakScore: 82, podcastDate: '2026-01-20', peakDate: '2026-03-08', igBase: 800, igGrowthRate: 0.07, googleBase: 18, googlePeak: 45, fbAds: [1,2,3,4,6,9], influencer: 'sinclair', category: 'longevity' },
+  nmn:               { baseScore: 60, peakScore: 78, podcastDate: '2025-10-15', peakDate: '2025-12-01', igBase: 8000, igGrowthRate: 0.03, googleBase: 48, googlePeak: 68, fbAds: [22,25,28,30,33,35], influencer: 'sinclair', category: 'longevity' },
+  'taurine':         { baseScore: 30, peakScore: 68, podcastDate: '2026-01-05', peakDate: '2026-02-15', igBase: 5500, igGrowthRate: 0.05, googleBase: 30, googlePeak: 48, fbAds: [8,10,12,14,16,18], influencer: 'sinclair', category: 'longevity' },
+  'fisetin':         { baseScore: 15, peakScore: 85, podcastDate: '2026-03-05', peakDate: '2026-03-18', igBase: 300, igGrowthRate: 0.15, googleBase: 8, googlePeak: 52, fbAds: [0,0,1,1,2,3], influencer: 'sinclair', category: 'longevity' },
+  'ca-akg':          { baseScore: 10, peakScore: 79, podcastDate: '2026-03-10', peakDate: '2026-03-19', igBase: 150, igGrowthRate: 0.18, googleBase: 5, googlePeak: 35, fbAds: [0,0,0,1,1,2], influencer: 'attia', category: 'longevity' },
+
+  // ── 호르몬/남성건강 ──
+  'tongkat ali':     { baseScore: 45, peakScore: 85, podcastDate: '2025-11-10', peakDate: '2026-01-10', igBase: 3500, igGrowthRate: 0.06, googleBase: 35, googlePeak: 72, fbAds: [5,7,8,9,10,12], influencer: 'huberman', category: 'hormone' },
+  'fadogia agrestis':{ baseScore: 55, peakScore: 71, podcastDate: '2025-10-05', peakDate: '2026-01-25', igBase: 1800, igGrowthRate: 0.03, googleBase: 20, googlePeak: 30, fbAds: [15,18,20,22,25,28], influencer: 'huberman', category: 'hormone' },
+  turkesterone:      { baseScore: 65, peakScore: 48, podcastDate: '2025-04-01', peakDate: '2025-07-01', igBase: 9500, igGrowthRate: -0.01, googleBase: 45, googlePeak: 25, fbAds: [45,50,55,58,62,67], influencer: 'huberman', category: 'hormone' },
+  'boron':           { baseScore: 18, peakScore: 74, podcastDate: '2026-02-28', peakDate: '2026-03-15', igBase: 600, igGrowthRate: 0.10, googleBase: 14, googlePeak: 42, fbAds: [1,2,2,3,4,5], influencer: 'huberman', category: 'hormone' },
+
+  // ── 수면/회복 ──
+  apigenin:          { baseScore: 40, peakScore: 74, podcastDate: '2025-12-10', peakDate: '2026-02-20', igBase: 2200, igGrowthRate: 0.04, googleBase: 22, googlePeak: 35, fbAds: [10,12,14,16,19,22], influencer: 'huberman', category: 'sleep' },
+  'magnesium threonate': { baseScore: 38, peakScore: 80, podcastDate: '2026-01-25', peakDate: '2026-03-05', igBase: 1800, igGrowthRate: 0.07, googleBase: 20, googlePeak: 55, fbAds: [4,5,6,8,10,12], influencer: 'huberman', category: 'sleep' },
+  'glycine':         { baseScore: 22, peakScore: 72, podcastDate: '2026-02-10', peakDate: '2026-03-10', igBase: 900, igGrowthRate: 0.09, googleBase: 15, googlePeak: 38, fbAds: [2,3,3,4,5,7], influencer: 'huberman', category: 'sleep' },
+  'l-theanine':      { baseScore: 50, peakScore: 65, podcastDate: '2025-10-01', peakDate: '2025-12-15', igBase: 4500, igGrowthRate: 0.02, googleBase: 40, googlePeak: 52, fbAds: [18,20,22,24,26,28], influencer: 'huberman', category: 'sleep' },
+
+  // ── 장건강/소화 ──
+  'sea moss':        { baseScore: 50, peakScore: 63, podcastDate: '2025-11-20', peakDate: '2026-01-10', igBase: 12000, igGrowthRate: 0.02, googleBase: 48, googlePeak: 58, fbAds: [30,33,36,38,42,45], influencer: 'brecka', category: 'gut' },
+  'akkermansia':     { baseScore: 12, peakScore: 90, podcastDate: '2026-03-08', peakDate: '2026-03-19', igBase: 200, igGrowthRate: 0.22, googleBase: 6, googlePeak: 48, fbAds: [0,0,0,1,1,2], influencer: 'huberman', category: 'gut' },
+  'tributyrin':      { baseScore: 8, peakScore: 83, podcastDate: '2026-03-12', peakDate: '2026-03-19', igBase: 100, igGrowthRate: 0.25, googleBase: 3, googlePeak: 30, fbAds: [0,0,0,0,1,1], influencer: 'attia', category: 'gut' },
+  'postbiotics':     { baseScore: 15, peakScore: 77, podcastDate: '2026-02-15', peakDate: '2026-03-10', igBase: 500, igGrowthRate: 0.14, googleBase: 10, googlePeak: 35, fbAds: [1,1,2,3,4,5], influencer: 'hyman', category: 'gut' },
+  'psyllium husk':   { baseScore: 55, peakScore: 60, podcastDate: '2025-09-01', peakDate: '2025-11-01', igBase: 6000, igGrowthRate: 0.01, googleBase: 45, googlePeak: 50, fbAds: [25,28,30,32,35,38], influencer: 'brecka', category: 'gut' },
+
+  // ── 멘탈/인지 ──
+  'lion\'s mane':    { baseScore: 42, peakScore: 78, podcastDate: '2026-01-20', peakDate: '2026-03-05', igBase: 5200, igGrowthRate: 0.06, googleBase: 35, googlePeak: 60, fbAds: [8,10,12,14,16,19], influencer: 'huberman', category: 'mental' },
+  'alpha-gpc':       { baseScore: 30, peakScore: 70, podcastDate: '2026-02-05', peakDate: '2026-03-10', igBase: 1400, igGrowthRate: 0.08, googleBase: 18, googlePeak: 40, fbAds: [5,6,7,8,10,12], influencer: 'huberman', category: 'mental' },
+  'methylene blue':  { baseScore: 10, peakScore: 86, podcastDate: '2026-03-01', peakDate: '2026-03-15', igBase: 350, igGrowthRate: 0.20, googleBase: 7, googlePeak: 45, fbAds: [0,0,1,1,2,3], influencer: 'attia', category: 'mental' },
+  'creatine':        { baseScore: 70, peakScore: 65, podcastDate: '2025-09-01', peakDate: '2025-11-01', igBase: 25000, igGrowthRate: 0.01, googleBase: 72, googlePeak: 75, fbAds: [80,82,85,88,90,92], influencer: 'attia', category: 'mental' },
+  'phosphatidylserine': { baseScore: 20, peakScore: 73, podcastDate: '2026-02-20', peakDate: '2026-03-12', igBase: 700, igGrowthRate: 0.11, googleBase: 12, googlePeak: 35, fbAds: [2,3,3,4,5,7], influencer: 'huberman', category: 'mental' },
+
+  // ── 면역/해독 ──
+  'glutathione':     { baseScore: 35, peakScore: 72, podcastDate: '2026-02-01', peakDate: '2026-03-05', igBase: 3200, igGrowthRate: 0.06, googleBase: 25, googlePeak: 42, fbAds: [5,6,8,10,12,15], influencer: 'hyman', category: 'immune' },
+  'sulforaphane':    { baseScore: 28, peakScore: 76, podcastDate: '2026-01-15', peakDate: '2026-03-01', igBase: 1600, igGrowthRate: 0.09, googleBase: 15, googlePeak: 38, fbAds: [3,4,5,7,9,11], influencer: 'patrick', category: 'immune' },
+  'nac':             { baseScore: 45, peakScore: 70, podcastDate: '2025-11-01', peakDate: '2026-01-15', igBase: 4200, igGrowthRate: 0.03, googleBase: 32, googlePeak: 44, fbAds: [18,20,22,24,26,28], influencer: 'hyman', category: 'immune' },
+  berberine:         { baseScore: 72, peakScore: 55, podcastDate: '2025-06-01', peakDate: '2025-09-01', igBase: 15000, igGrowthRate: 0.01, googleBase: 62, googlePeak: 52, fbAds: [55,62,68,75,82,89], influencer: 'attia', category: 'immune' },
+  'quercetin':       { baseScore: 32, peakScore: 68, podcastDate: '2026-02-10', peakDate: '2026-03-08', igBase: 2800, igGrowthRate: 0.05, googleBase: 22, googlePeak: 38, fbAds: [6,7,8,10,12,14], influencer: 'sinclair', category: 'immune' },
+
+  // ── 스킨케어/뷰티 웰니스 ──
+  'collagen peptides': { baseScore: 62, peakScore: 58, podcastDate: '2025-08-01', peakDate: '2025-10-01', igBase: 18000, igGrowthRate: 0.01, googleBase: 55, googlePeak: 58, fbAds: [42,45,48,52,55,60], influencer: 'hyman', category: 'skin' },
+  'astaxanthin':     { baseScore: 20, peakScore: 81, podcastDate: '2026-02-25', peakDate: '2026-03-15', igBase: 1100, igGrowthRate: 0.13, googleBase: 14, googlePeak: 48, fbAds: [1,2,3,4,5,7], influencer: 'patrick', category: 'skin' },
+  'ceramides':       { baseScore: 14, peakScore: 75, podcastDate: '2026-03-05', peakDate: '2026-03-18', igBase: 450, igGrowthRate: 0.16, googleBase: 8, googlePeak: 32, fbAds: [0,1,1,2,3,4], influencer: 'hyman', category: 'skin' },
+  'hyaluronic acid supplement': { baseScore: 25, peakScore: 70, podcastDate: '2026-02-12', peakDate: '2026-03-08', igBase: 1500, igGrowthRate: 0.08, googleBase: 18, googlePeak: 40, fbAds: [3,4,5,6,8,10], influencer: 'hyman', category: 'skin' },
+
+  // ── 에너지/체력 ──
+  'coq10':           { baseScore: 48, peakScore: 72, podcastDate: '2025-12-15', peakDate: '2026-02-10', igBase: 3800, igGrowthRate: 0.04, googleBase: 38, googlePeak: 52, fbAds: [12,14,16,18,20,22], influencer: 'attia', category: 'energy' },
+  'pqq':             { baseScore: 16, peakScore: 78, podcastDate: '2026-02-28', peakDate: '2026-03-14', igBase: 500, igGrowthRate: 0.14, googleBase: 10, googlePeak: 38, fbAds: [1,1,2,3,4,5], influencer: 'sinclair', category: 'energy' },
+  'd-ribose':        { baseScore: 12, peakScore: 74, podcastDate: '2026-03-08', peakDate: '2026-03-18', igBase: 250, igGrowthRate: 0.19, googleBase: 6, googlePeak: 28, fbAds: [0,0,1,1,2,3], influencer: 'brecka', category: 'energy' },
+  'cordyceps':       { baseScore: 35, peakScore: 75, podcastDate: '2026-01-10', peakDate: '2026-03-01', igBase: 2800, igGrowthRate: 0.07, googleBase: 22, googlePeak: 45, fbAds: [4,5,6,8,10,12], influencer: 'huberman', category: 'energy' },
+
+  // ── 여성건강 ──
+  'myo-inositol':    { baseScore: 18, peakScore: 84, podcastDate: '2026-02-22', peakDate: '2026-03-14', igBase: 1200, igGrowthRate: 0.16, googleBase: 15, googlePeak: 55, fbAds: [1,2,3,4,5,7], influencer: 'hyman', category: 'women' },
+  'dim supplement':  { baseScore: 22, peakScore: 76, podcastDate: '2026-02-18', peakDate: '2026-03-10', igBase: 800, igGrowthRate: 0.12, googleBase: 12, googlePeak: 40, fbAds: [2,3,4,5,6,8], influencer: 'hyman', category: 'women' },
+  'vitex':           { baseScore: 28, peakScore: 71, podcastDate: '2026-01-28', peakDate: '2026-03-05', igBase: 1500, igGrowthRate: 0.08, googleBase: 18, googlePeak: 35, fbAds: [4,5,6,7,8,10], influencer: 'hyman', category: 'women' },
+};
+
+// ── META 오가닉 트렌드 데이터 (IG 릴스 + FB 그룹) ──────────
+function generateMetaTrends() {
+  const metaData = [];
+  const now = Date.now();
+  for (const [keyword, profile] of Object.entries(KEYWORD_PROFILES)) {
+    const daysSincePodcast = (now - new Date(profile.podcastDate).getTime()) / 86400000;
+    const isHot = daysSincePodcast >= 0 && daysSincePodcast < 60;
+
+    // Instagram Reels 데이터
+    const reelsBase = Math.floor(profile.igBase * 0.3);
+    const reelsGrowth = isHot ? profile.igGrowthRate * 2.5 : profile.igGrowthRate * 0.5;
+    const reelsCount = Math.round(reelsBase * (1 + reelsGrowth * Math.min(daysSincePodcast / 7, 8)));
+    const reelsViews = reelsCount * (2000 + Math.floor(Math.random() * 8000));
+    const avgEngagement = (2.5 + Math.random() * 5).toFixed(1);
+    const viralReels = isHot ? Math.floor(Math.random() * 5) + 1 : Math.floor(Math.random() * 2);
+
+    // Facebook 그룹 멘션 데이터
+    const fbGroupMentions = isHot
+      ? Math.floor(50 + Math.random() * 150 + daysSincePodcast * 3)
+      : Math.floor(5 + Math.random() * 30);
+    const fbGroupsActive = isHot
+      ? Math.floor(8 + Math.random() * 12)
+      : Math.floor(2 + Math.random() * 5);
+
+    // 트렌드 속도 감지
+    let velocity = 'stable';
+    let velocityScore = 0;
+    if (isHot && daysSincePodcast < 14) {
+      velocity = 'exploding';
+      velocityScore = 95 + Math.floor(Math.random() * 5);
+    } else if (isHot && daysSincePodcast < 30) {
+      velocity = 'surging';
+      velocityScore = 70 + Math.floor(Math.random() * 20);
+    } else if (isHot) {
+      velocity = 'rising';
+      velocityScore = 40 + Math.floor(Math.random() * 25);
+    } else if (profile.igGrowthRate < 0) {
+      velocity = 'declining';
+      velocityScore = 10 + Math.floor(Math.random() * 15);
+    } else {
+      velocityScore = 20 + Math.floor(Math.random() * 15);
+    }
+
+    // 인플루언서 Reels/Stories 언급
+    const influencerMentions = [];
+    if (isHot && daysSincePodcast < 30) {
+      influencerMentions.push(
+        { platform: 'ig_reels', account: `@${profile.influencer}_clips`, followers: '500K-2M', date: profile.podcastDate, views: Math.floor(200000 + Math.random() * 800000) },
+      );
+      if (Math.random() > 0.5) {
+        influencerMentions.push(
+          { platform: 'ig_stories', account: `@wellness_daily`, followers: '100K-500K', date: daysAgo(Math.floor(Math.random() * 14)), views: Math.floor(50000 + Math.random() * 200000) },
+        );
+      }
+    }
+
+    // 관련 해시태그 클러스터
+    const relatedHashtags = [
+      `#${keyword.replace(/[\s'-]/g, '')}`,
+      `#${keyword.replace(/[\s'-]/g, '')}supplement`,
+      `#${keyword.replace(/[\s'-]/g, '')}benefits`,
+    ];
+    if (profile.category === 'longevity') relatedHashtags.push('#longevity', '#antiaging', '#biohacking');
+    if (profile.category === 'sleep') relatedHashtags.push('#sleepoptimization', '#bettersleep');
+    if (profile.category === 'gut') relatedHashtags.push('#guthealth', '#microbiome');
+    if (profile.category === 'mental') relatedHashtags.push('#brainhealth', '#nootropics');
+    if (profile.category === 'skin') relatedHashtags.push('#skinhealth', '#glowup');
+    if (profile.category === 'women') relatedHashtags.push('#womenshealth', '#hormonebalance');
+
+    metaData.push({
+      keyword,
+      category: profile.category,
+      velocity,
+      velocity_score: velocityScore,
+      ig_reels: { count: reelsCount, total_views: reelsViews, avg_engagement_rate: parseFloat(avgEngagement), viral_reels: viralReels, growth_7d: isHot ? Math.round(reelsGrowth * 100 * 7) : Math.round((Math.random() * 8 - 2)), },
+      ig_hashtags: { related: relatedHashtags, total_posts: profile.igBase + reelsCount, weekly_new_posts: Math.floor(reelsCount * 0.15), },
+      fb_groups: { total_mentions: fbGroupMentions, active_groups: fbGroupsActive, top_groups: ['Biohackers United', 'Supplement Science', 'Longevity & Wellness'].slice(0, fbGroupsActive > 5 ? 3 : 1), sentiment: fbGroupMentions > 100 ? 'very_positive' : fbGroupMentions > 30 ? 'positive' : 'neutral', },
+      influencer_mentions: influencerMentions,
+      snapshot_date: daysAgo(0),
+    });
+  }
+  return metaData;
+}
+
+// ── 경쟁 제품 인텔리전스 데이터 ──────────────────────
+function generateCompetitorData() {
+  const competitors = {};
+  for (const [keyword, profile] of Object.entries(KEYWORD_PROFILES)) {
+    const adCount = profile.fbAds[5] || 5;
+    const isEarly = adCount < 10;
+
+    // Amazon Top Products (시뮬레이션)
+    const amazonProducts = [];
+    const brands = isEarly
+      ? ['Nootropics Depot', 'Double Wood', 'Pure Encapsulations']
+      : ['NOW Foods', 'Jarrow Formulas', 'Life Extension', 'Thorne', 'Pure Encapsulations', 'Doctor\'s Best'];
+    const numProducts = Math.min(brands.length, isEarly ? 3 : 5);
+    for (let i = 0; i < numProducts; i++) {
+      amazonProducts.push({
+        rank: i + 1,
+        brand: brands[i],
+        title: `${brands[i]} ${keyword.charAt(0).toUpperCase() + keyword.slice(1)} Supplement`,
+        price: (19.99 + Math.random() * 30).toFixed(2),
+        rating: (3.8 + Math.random() * 1.2).toFixed(1),
+        reviews: Math.floor(100 + Math.random() * (isEarly ? 500 : 5000)),
+        monthly_sales_est: Math.floor(isEarly ? 200 + Math.random() * 800 : 1000 + Math.random() * 10000),
+        bsr: Math.floor(isEarly ? 5000 + Math.random() * 50000 : 500 + Math.random() * 5000),
+      });
+    }
+
+    // Top FB Advertisers
+    const fbAdvertisers = [];
+    for (let i = 0; i < Math.min(adCount, 5); i++) {
+      fbAdvertisers.push({
+        name: brands[i % brands.length],
+        active_ads: Math.floor(1 + Math.random() * 8),
+        ad_spend_est: `$${Math.floor(500 + Math.random() * 5000)}/mo`,
+        started: daysAgo(Math.floor(Math.random() * 90)),
+      });
+    }
+
+    competitors[keyword] = {
+      amazon_top_products: amazonProducts,
+      fb_top_advertisers: fbAdvertisers,
+      market_size_est: isEarly ? 'emerging' : adCount < 30 ? 'growing' : 'mature',
+      avg_price: (parseFloat(amazonProducts.reduce((s, p) => s + parseFloat(p.price), 0) / amazonProducts.length) || 0).toFixed(2),
+      entry_difficulty: isEarly ? 'easy' : adCount < 30 ? 'medium' : 'hard',
+      category: profile.category,
+    };
+  }
+  return competitors;
+}
 
 // 6개월 주간 히스토리컬 기회 점수 생성
 function generateHistoricalOpportunityScores() {
@@ -169,6 +358,25 @@ const DEMO_PODCAST_KEYWORDS = [
   { influencer: 'sinclair', keyword: 'spermidine', mentioned_date: '2026-03-08', episode_title: 'Reversing Aging — Latest Research', mention_context: 'benefit_explanation', mention_quote: 'Spermidine is fascinating because it mimics the autophagy benefits of caloric restriction.' },
   { influencer: 'patrick', keyword: 'sulforaphane', mentioned_date: '2026-03-01', episode_title: 'Cruciferous Vegetables & NRF2 Pathway', mention_context: 'benefit_explanation', mention_quote: 'Sulforaphane activates NRF2 which upregulates over 200 protective genes.' },
   { influencer: 'hyman', keyword: 'glutathione', mentioned_date: '2026-03-05', episode_title: 'Detox That Actually Works', mention_context: 'personal_use', mention_quote: 'Liposomal glutathione is the single most important antioxidant I recommend to my patients.' },
+  // 장건강 신규
+  { influencer: 'huberman', keyword: 'akkermansia', mentioned_date: '2026-03-08', episode_title: 'The Gut-Brain Axis — New Frontiers', mention_context: 'benefit_explanation', mention_quote: 'Akkermansia muciniphila is one of the most exciting probiotics. It strengthens the gut lining and has metabolic benefits.' },
+  { influencer: 'attia', keyword: 'tributyrin', mentioned_date: '2026-03-12', episode_title: '#299 — Gut Health & Longevity', mention_context: 'benefit_explanation', mention_quote: 'Tributyrin delivers butyrate directly to the colon. It is far more effective than eating fiber alone for gut barrier integrity.' },
+  // 장수 신규
+  { influencer: 'sinclair', keyword: 'fisetin', mentioned_date: '2026-03-05', episode_title: 'Senolytic Supplements — Clearing Zombie Cells', mention_context: 'benefit_explanation', mention_quote: 'Fisetin is the most potent natural senolytic we have found. It clears senescent cells at doses achievable through supplementation.' },
+  { influencer: 'attia', keyword: 'ca-akg', mentioned_date: '2026-03-10', episode_title: '#300 — Alpha-Ketoglutarate & Biological Age', mention_context: 'benefit_explanation', mention_quote: 'Calcium alpha-ketoglutarate reduced biological age by an average of 8 years in a recent human trial.' },
+  // 멘탈 신규
+  { influencer: 'attia', keyword: 'methylene blue', mentioned_date: '2026-03-01', episode_title: '#294 — Mitochondrial Enhancement for the Brain', mention_context: 'benefit_explanation', mention_quote: 'Low-dose methylene blue at 0.5-1mg/kg enhances mitochondrial function in neurons. The cognitive benefits are remarkable.' },
+  // 호르몬 신규
+  { influencer: 'huberman', keyword: 'boron', mentioned_date: '2026-02-28', episode_title: 'Micronutrients for Hormone Health', mention_context: 'benefit_explanation', mention_quote: 'Boron at just 6-10mg per day can significantly increase free testosterone by reducing SHBG.' },
+  // 스킨케어 신규
+  { influencer: 'patrick', keyword: 'astaxanthin', mentioned_date: '2026-02-25', episode_title: 'Carotenoids & Skin Protection', mention_context: 'benefit_explanation', mention_quote: 'Astaxanthin is 6000x more potent than vitamin C as an antioxidant. It protects skin from UV damage from the inside.' },
+  { influencer: 'hyman', keyword: 'ceramides', mentioned_date: '2026-03-05', episode_title: 'Skin Longevity — Inside Out Approach', mention_context: 'benefit_explanation', mention_quote: 'Oral ceramide supplements rebuild the skin barrier. My patients see visible improvements in hydration within 4 weeks.' },
+  // 에너지 신규
+  { influencer: 'sinclair', keyword: 'pqq', mentioned_date: '2026-02-28', episode_title: 'Mitochondrial Biogenesis — Beyond NAD+', mention_context: 'benefit_explanation', mention_quote: 'PQQ stimulates mitochondrial biogenesis — it actually creates new mitochondria, not just repairs existing ones.' },
+  { influencer: 'brecka', keyword: 'd-ribose', mentioned_date: '2026-03-08', episode_title: 'Cellular Energy & Athletic Recovery', mention_context: 'personal_use', mention_quote: 'D-ribose is the backbone of ATP. I give it to every patient with fatigue and the results are consistent.' },
+  // 여성건강 신규
+  { influencer: 'hyman', keyword: 'myo-inositol', mentioned_date: '2026-02-22', episode_title: 'PCOS & Metabolic Health Solutions', mention_context: 'benefit_explanation', mention_quote: 'Myo-inositol at 4g daily rivals metformin for insulin sensitivity in PCOS patients, with far fewer side effects.' },
+  { influencer: 'hyman', keyword: 'dim supplement', mentioned_date: '2026-02-18', episode_title: 'Estrogen Balance — Natural Approaches', mention_context: 'benefit_explanation', mention_quote: 'DIM promotes healthy estrogen metabolism. It shifts the ratio toward protective 2-hydroxy estrogens.' },
   // ── 2026-02 ──
   { influencer: 'sinclair', keyword: 'nmn', mentioned_date: '2026-02-28', episode_title: 'NAD+ Pathways & Anti-Aging', mention_context: 'personal_use', mention_quote: 'I continue to take NMN daily as part of my longevity protocol.' },
   { influencer: 'huberman', keyword: 'apigenin', mentioned_date: '2026-02-20', episode_title: 'Sleep Toolkit — 2026 Update', mention_context: 'personal_use', mention_quote: 'Apigenin at 50mg before bed has been part of my sleep stack for over two years now.' },
@@ -211,6 +419,15 @@ const DEMO_KEYWORD_ORIGINS = [
   { keyword: 'glutathione', first_podcast_date: '2026-02-01', first_podcast_influencer: 'hyman', first_podcast_episode_title: 'The Master Antioxidant', first_podcast_quote: 'Glutathione depletion is at the root of almost every chronic disease I see.', market_creator_influencer: 'hyman', market_creator_ig_growth: 95.2, golden_time_start: '2026-02-01', golden_time_end: null, golden_time_duration_days: null, analysis_report: '골든타임 진행 중 (45일째). Hyman 추천 후 리포솜 글루타치온 검색량 급증. 경쟁 아직 낮음.' },
   { keyword: 'nmn', first_podcast_date: '2025-10-15', first_podcast_influencer: 'sinclair', first_podcast_episode_title: 'Anti-Aging Stack 2025', first_podcast_quote: 'NMN remains the cornerstone of my longevity supplement stack.', market_creator_influencer: 'sinclair', market_creator_ig_growth: 45.3, golden_time_start: '2025-10-15', golden_time_end: '2025-12-01', golden_time_duration_days: 47, analysis_report: '골든타임 종료 (47일). Sinclair 장기 추천 키워드. 이미 35개 이상 광고주 존재. 차별화 전략 필수.' },
   { keyword: 'berberine', first_podcast_date: '2025-06-01', first_podcast_influencer: 'attia', first_podcast_episode_title: 'Metabolic Health Deep Dive', first_podcast_quote: 'Berberine activates AMPK similar to exercise...', market_creator_influencer: 'attia', market_creator_ig_growth: 22.1, golden_time_start: '2025-06-01', golden_time_end: '2025-08-01', golden_time_duration_days: 61, analysis_report: '골든타임 종료 (61일). GLP-1 대안으로 2025년 초 급성장했으나 현재 89개 광고주로 포화.' },
+  // ── 신규 고기회 키워드 ──
+  { keyword: 'akkermansia', first_podcast_date: '2026-03-08', first_podcast_influencer: 'huberman', first_podcast_episode_title: 'The Gut-Brain Axis — New Frontiers', first_podcast_quote: 'Akkermansia muciniphila is one of the most exciting probiotics...', market_creator_influencer: 'huberman', market_creator_ig_growth: 285.4, golden_time_start: '2026-03-08', golden_time_end: null, golden_time_duration_days: null, analysis_report: '🔥 골든타임 시작 (11일째). 장건강 신흥 키워드. Huberman 언급 직후 IG 릴스 폭발적 성장. 광고주 2개 미만. 즉시 진입 최적 타이밍!' },
+  { keyword: 'tributyrin', first_podcast_date: '2026-03-12', first_podcast_influencer: 'attia', first_podcast_episode_title: '#299 — Gut Health & Longevity', first_podcast_quote: 'Tributyrin delivers butyrate directly to the colon...', market_creator_influencer: 'attia', market_creator_ig_growth: 320.1, golden_time_start: '2026-03-12', golden_time_end: null, golden_time_duration_days: null, analysis_report: '🔥 골든타임 시작 (7일째). 뷰티레이트 전달 성분. 경쟁 거의 없음. 장건강 + 장수 교차 카테고리로 타겟 가능.' },
+  { keyword: 'fisetin', first_podcast_date: '2026-03-05', first_podcast_influencer: 'sinclair', first_podcast_episode_title: 'Senolytic Supplements', first_podcast_quote: 'Fisetin is the most potent natural senolytic...', market_creator_influencer: 'sinclair', market_creator_ig_growth: 198.7, golden_time_start: '2026-03-05', golden_time_end: null, golden_time_duration_days: null, analysis_report: '골든타임 진행 중 (14일째). 세놀리틱(노화세포 제거) 카테고리 선두 키워드. Sinclair 추천 후 검색량 급등. 경쟁 아직 3개 미만.' },
+  { keyword: 'ca-akg', first_podcast_date: '2026-03-10', first_podcast_influencer: 'attia', first_podcast_episode_title: '#300 — Alpha-Ketoglutarate', first_podcast_quote: 'Calcium AKG reduced biological age by 8 years...', market_creator_influencer: 'attia', market_creator_ig_growth: 256.3, golden_time_start: '2026-03-10', golden_time_end: null, golden_time_duration_days: null, analysis_report: '🔥 골든타임 시작 (9일째). 생물학적 연령 역전 키워드. Attia 에피소드 #300 마일스톤 에피소드에서 언급. 바이럴 잠재력 최고.' },
+  { keyword: 'methylene blue', first_podcast_date: '2026-03-01', first_podcast_influencer: 'attia', first_podcast_episode_title: '#294 — Mitochondrial Enhancement for Brain', first_podcast_quote: 'Low-dose methylene blue enhances mitochondrial function in neurons...', market_creator_influencer: 'attia', market_creator_ig_growth: 175.2, golden_time_start: '2026-03-01', golden_time_end: null, golden_time_duration_days: null, analysis_report: '골든타임 진행 중 (18일째). 인지 기능 향상 신규 키워드. 노트로픽 커뮤니티에서 빠르게 확산 중. 광고주 3개로 저경쟁.' },
+  { keyword: 'myo-inositol', first_podcast_date: '2026-02-22', first_podcast_influencer: 'hyman', first_podcast_episode_title: 'PCOS & Metabolic Health', first_podcast_quote: 'Myo-inositol rivals metformin for insulin sensitivity in PCOS...', market_creator_influencer: 'hyman', market_creator_ig_growth: 167.8, golden_time_start: '2026-02-22', golden_time_end: null, golden_time_duration_days: null, analysis_report: '골든타임 진행 중 (25일째). 여성건강 핵심 키워드. PCOS 시장 급성장 중. 타겟 명확하고 충성도 높은 구매층.' },
+  { keyword: 'astaxanthin', first_podcast_date: '2026-02-25', first_podcast_influencer: 'patrick', first_podcast_episode_title: 'Carotenoids & Skin Protection', first_podcast_quote: 'Astaxanthin is 6000x more potent than vitamin C...', market_creator_influencer: 'patrick', market_creator_ig_growth: 145.9, golden_time_start: '2026-02-25', golden_time_end: null, golden_time_duration_days: null, analysis_report: '골든타임 진행 중 (22일째). 내부 자외선 차단 + 안티에이징 교차 포지셔닝 가능. 뷰티 인플루언서들이 주목하기 시작.' },
+  { keyword: 'boron', first_podcast_date: '2026-02-28', first_podcast_influencer: 'huberman', first_podcast_episode_title: 'Micronutrients for Hormone Health', first_podcast_quote: 'Boron at just 6-10mg per day can significantly increase free testosterone...', market_creator_influencer: 'huberman', market_creator_ig_growth: 132.4, golden_time_start: '2026-02-28', golden_time_end: null, golden_time_duration_days: null, analysis_report: '골든타임 진행 중 (19일째). 저비용 호르몬 최적화 미네랄. 톤갯알리/파도기아 대비 가격 경쟁력 우위.' },
 ];
 
 // 최신 스냅샷만 반환 (대시보드 기본)
@@ -240,6 +457,51 @@ const DEMO_OPPORTUNITY_SCORES = getLatestOpportunityScores();
 const DEMO_GOOGLE_TRENDS = getLatestGoogleTrends();
 
 // ── API 엔드포인트 ──────────────────────────────────────
+
+// 카테고리 API
+app.get('/api/categories', (req, res) => {
+  res.json(CATEGORIES);
+});
+
+// META 트렌드 API
+app.get('/api/meta-trends', (req, res) => {
+  const category = req.query.category;
+  let data = generateMetaTrends();
+  if (category && category !== 'all') {
+    data = data.filter(d => d.category === category);
+  }
+  // velocity_score 기준 정렬
+  data.sort((a, b) => b.velocity_score - a.velocity_score);
+  res.json(data);
+});
+
+// 경쟁 제품 인텔리전스 API
+app.get('/api/competitors', (req, res) => {
+  const keyword = req.query.keyword;
+  const all = generateCompetitorData();
+  if (keyword) {
+    return res.json(all[keyword] || { error: '키워드 없음' });
+  }
+  res.json(all);
+});
+
+// 경쟁 제품 요약 API (대시보드 카드용)
+app.get('/api/competitors/summary', (req, res) => {
+  const all = generateCompetitorData();
+  const summary = Object.entries(all).map(([keyword, data]) => ({
+    keyword,
+    category: data.category,
+    market_size: data.market_size_est,
+    entry_difficulty: data.entry_difficulty,
+    avg_price: data.avg_price,
+    top_brands: data.amazon_top_products.slice(0, 3).map(p => p.brand),
+    fb_advertisers: data.fb_top_advertisers.length,
+  })).sort((a, b) => {
+    const order = { easy: 0, medium: 1, hard: 2 };
+    return (order[a.entry_difficulty] || 0) - (order[b.entry_difficulty] || 0);
+  });
+  res.json(summary);
+});
 
 // 대시보드 서빙
 app.get('/', (req, res) => {
