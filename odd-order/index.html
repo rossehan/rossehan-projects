@@ -2730,23 +2730,33 @@
           </div>
           <hr class="divider" style="margin:20px 0 16px;" />
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
               <button class="btn btn-primary" onclick="handleTab2DownloadClick()">
                 ⬇️ 송장 다운로드
               </button>
-              <button class="btn btn-success" onclick="handleTab2SaveClick()" ${getActiveRound() ? '' : 'disabled title="공구 라운드가 없으면 확정 저장할 수 없습니다"'}>
-                💾 확정 저장
+              <span style="color:#9ca3af;font-size:13px;">또는</span>
+              <select id="courier-select" style="padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:13px;background:#fff;">
+                <option value="CJGLS">CJ대한통운</option>
+                <option value="HANJIN">한진택배</option>
+                <option value="LOTTE">롯데택배</option>
+                <option value="EPOST">우체국택배</option>
+                <option value="KGB">로젠택배</option>
+                <option value="KDEXP">경동택배</option>
+              </select>
+              <button class="btn btn-success" onclick="handleAutoRegisterClick()" id="btn-auto-register">
+                🚀 송장 자동 등록
               </button>
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;">
-              <button class="btn btn-secondary btn-sm" onclick="undoLastChange()">
-                ↩ 되돌리기
+              <button class="btn btn-secondary btn-sm" onclick="handleTab2SaveClick()" ${getActiveRound() ? '' : 'disabled title="공구 라운드가 없으면 확정 저장할 수 없습니다"'}>
+                💾 확정 저장
               </button>
               <button class="btn btn-secondary btn-sm" onclick="resetTab2Upload()">
                 ↺ 다시 업로드
               </button>
             </div>
           </div>
+          <div id="auto-register-result" style="margin-top:12px;display:none;"></div>
         </div>
       `;
     }
@@ -2836,6 +2846,134 @@
         return;
       }
       updateShippingStatus(convertedTracking);
+    }
+
+    // ===== 송장 자동 등록 =====
+    async function handleAutoRegisterClick() {
+      if (!convertedTracking || convertedTracking.length === 0) {
+        showToast('등록할 송장이 없습니다.', 'warning');
+        return;
+      }
+
+      const naverOrders = convertedTracking.filter(t => t.channel !== 'coupang');
+      const coupangOrders = convertedTracking.filter(t => t.channel === 'coupang');
+      const courierSelect = document.getElementById('courier-select');
+      const courierCode = courierSelect ? courierSelect.value : 'CJGLS';
+      const courierName = courierSelect ? courierSelect.options[courierSelect.selectedIndex].text : 'CJ대한통운';
+
+      const msg = `송장 자동 등록을 진행하시겠습니까?\n\n` +
+        `택배사: ${courierName}\n` +
+        `네이버: ${naverOrders.length}건\n` +
+        `쿠팡: ${coupangOrders.length}건\n` +
+        `합계: ${convertedTracking.length}건\n\n` +
+        `등록 후 취소가 어렵습니다. 계속하시겠습니까?`;
+
+      if (!confirm(msg)) return;
+
+      const btn = document.getElementById('btn-auto-register');
+      if (btn) { btn.disabled = true; btn.textContent = '등록 중...'; }
+
+      const resultDiv = document.getElementById('auto-register-result');
+      if (resultDiv) {
+        resultDiv.style.display = 'block';
+        resultDiv.innerHTML = '<div style="padding:16px;background:#f0f9ff;border-radius:8px;color:#1e40af;font-size:14px;">송장 등록 진행 중... 잠시만 기다려주세요.</div>';
+      }
+
+      const results = { naver: null, coupang: null };
+
+      // 네이버 발송처리
+      if (naverOrders.length > 0) {
+        try {
+          const res = await fetch('/api/naver-dispatch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orders: naverOrders.map(o => ({
+                productOrderId: o.productOrderNo,
+                trackingNumber: o.trackingNo,
+              })),
+              deliveryCompanyCode: courierCode,
+            }),
+          });
+          const data = await res.json();
+          results.naver = data;
+        } catch (err) {
+          results.naver = { success: false, error: err.message };
+        }
+      }
+
+      // 쿠팡 송장등록
+      if (coupangOrders.length > 0) {
+        try {
+          const res = await fetch('/api/coupang-invoice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              orders: coupangOrders.map(o => ({
+                orderId: o.productOrderNo,
+                trackingNumber: o.trackingNo,
+              })),
+              deliveryCompanyCode: courierCode,
+            }),
+          });
+          const data = await res.json();
+          results.coupang = data;
+        } catch (err) {
+          results.coupang = { success: false, error: err.message };
+        }
+      }
+
+      // 결과 표시
+      if (btn) { btn.disabled = false; btn.textContent = '🚀 송장 자동 등록'; }
+      renderAutoRegisterResult(results, naverOrders.length, coupangOrders.length);
+    }
+
+    function renderAutoRegisterResult(results, naverTotal, coupangTotal) {
+      const div = document.getElementById('auto-register-result');
+      if (!div) return;
+      div.style.display = 'block';
+
+      let html = '<div style="padding:16px;border-radius:8px;border:1px solid #e5e7eb;background:#fafafa;">';
+      html += '<div style="font-weight:600;font-size:15px;margin-bottom:10px;">송장 등록 결과</div>';
+
+      // 네이버 결과
+      if (naverTotal > 0) {
+        const nv = results.naver;
+        if (nv && nv.success) {
+          html += `<div style="padding:8px 12px;background:#ecfdf5;border-radius:6px;margin-bottom:6px;color:#065f46;font-size:13px;">
+            <span class="channel-badge channel-naver">네이버</span> ${nv.registeredCount || naverTotal}건 발송처리 완료</div>`;
+        } else {
+          html += `<div style="padding:8px 12px;background:#fef2f2;border-radius:6px;margin-bottom:6px;color:#991b1b;font-size:13px;">
+            <span class="channel-badge channel-naver">네이버</span> 실패: ${escapeHtml(nv?.error || '알 수 없는 오류')}</div>`;
+        }
+      }
+
+      // 쿠팡 결과
+      if (coupangTotal > 0) {
+        const cp = results.coupang;
+        if (cp && cp.success) {
+          html += `<div style="padding:8px 12px;background:#ecfdf5;border-radius:6px;margin-bottom:6px;color:#065f46;font-size:13px;">
+            <span class="channel-badge channel-coupang">쿠팡</span> ${cp.registeredCount || coupangTotal}건 송장등록 완료</div>`;
+          if (cp.errors && cp.errors.length > 0) {
+            html += `<div style="padding:6px 12px;background:#fffbeb;border-radius:6px;margin-bottom:6px;color:#92400e;font-size:12px;">
+              일부 주문 조회 실패 (${cp.errors.length}건): ${cp.errors.map(e => e.orderId).join(', ')}</div>`;
+          }
+        } else {
+          html += `<div style="padding:8px 12px;background:#fef2f2;border-radius:6px;margin-bottom:6px;color:#991b1b;font-size:13px;">
+            <span class="channel-badge channel-coupang">쿠팡</span> 실패: ${escapeHtml(cp?.error || '알 수 없는 오류')}</div>`;
+        }
+      }
+
+      const allSuccess = (!results.naver || results.naver.success) && (!results.coupang || results.coupang.success);
+      if (allSuccess) {
+        html += '<div style="margin-top:8px;color:#059669;font-size:13px;font-weight:500;">모든 채널 송장 등록이 완료되었습니다.</div>';
+        showToast('송장 자동 등록 완료!', 'success');
+      } else {
+        showToast('일부 송장 등록 실패. 결과를 확인해주세요.', 'warning');
+      }
+
+      html += '</div>';
+      div.innerHTML = html;
     }
 
     // ===== Task 7+8: 옵션별 매출 집계 =====
