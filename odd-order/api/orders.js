@@ -1,6 +1,15 @@
 import bcrypt from 'bcryptjs';
+import { ProxyAgent, fetch as proxyFetch } from 'undici';
 
 const NAVER_API_BASE = 'https://api.commerce.naver.com/external/v1';
+
+function getFetch() {
+  if (process.env.PROXY_URL) {
+    const dispatcher = new ProxyAgent(process.env.PROXY_URL);
+    return (url, opts = {}) => proxyFetch(url, { ...opts, dispatcher });
+  }
+  return globalThis.fetch;
+}
 
 async function getAccessToken() {
   const clientId = process.env.NAVER_CLIENT_ID;
@@ -23,7 +32,8 @@ async function getAccessToken() {
     type: 'SELF',
   });
 
-  const res = await fetch(`${NAVER_API_BASE}/oauth2/token`, {
+  const pFetch = getFetch();
+  const res = await pFetch(`${NAVER_API_BASE}/oauth2/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: params.toString(),
@@ -56,7 +66,8 @@ async function fetchOrders(token) {
       params.set('moreSequence', moreSequence);
     }
 
-    const res = await fetch(
+    const pFetch = getFetch();
+    const res = await pFetch(
       `${NAVER_API_BASE}/pay-order/seller/product-orders/last-changed-statuses?${params}`,
       {
         headers: { Authorization: `Bearer ${token}` },
@@ -85,7 +96,8 @@ async function fetchOrders(token) {
 }
 
 async function fetchOrderDetails(token, productOrderIds) {
-  const res = await fetch(
+  const pFetch = getFetch();
+  const res = await pFetch(
     `${NAVER_API_BASE}/pay-order/seller/product-orders/query`,
     {
       method: 'POST',
