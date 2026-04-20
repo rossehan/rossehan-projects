@@ -9,6 +9,7 @@ async function getAccessToken() {
   if (!clientId || !clientSecret) {
     throw new Error('NAVER_CLIENT_ID 또는 NAVER_CLIENT_SECRET 환경변수가 설정되지 않았습니다.');
   }
+  console.log('[DEBUG] clientId length:', clientId.length, 'clientSecret length:', clientSecret.length, 'clientSecret first3:', clientSecret.slice(0, 3));
 
   const timestamp = Date.now();
   const message = `${clientId}_${timestamp}`;
