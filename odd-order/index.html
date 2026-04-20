@@ -1374,6 +1374,8 @@
     const PRODUCT_MAP_COUPANG = {
       '95241053251': { code: 'P00300280', name: '오드 M-01 스타터키트 5일분' },
       '95241053249': { code: 'P00300281', name: '오드 M-01 리필팩 30일분' },
+      '95191843055': { code: 'P00300280', name: '오드 M-01 스타터키트 5일분' },
+      '95191843056': { code: 'P00300281', name: '오드 M-01 리필팩 30일분' },
     };
 
     // 옵션정보가 없을 때 상품명으로 매핑
@@ -1668,17 +1670,18 @@
       // 모든 셀 값을 2D 배열로 읽기
       const allValues = usedRange.value();
 
-      // 헤더 행 찾기
+      // 헤더 행 찾기 (네이버 또는 쿠팡 헤더 자동 감지)
       let headerIdx = -1;
       for (let i = 0; i < Math.min(allValues.length, 10); i++) {
         const row = (allValues[i] || []).map(c => String(c || '').trim());
-        if (row.includes('주문상태') || row.includes('상품주문번호') || row.includes('수취인명')) {
+        if (row.includes('주문상태') || row.includes('상품주문번호') || row.includes('수취인명')
+            || row.includes('묶음배송번호') || row.includes('옵션ID') || row.includes('수취인이름')) {
           headerIdx = i;
           break;
         }
       }
       if (headerIdx === -1) {
-        throw new Error('주문서 헤더를 찾을 수 없습니다. 스마트스토어 주문서 파일인지 확인해주세요.');
+        throw new Error('주문서 헤더를 찾을 수 없습니다. 스마트스토어 또는 쿠팡 주문서 파일인지 확인해주세요.');
       }
 
       const headers = allValues[headerIdx].map(h => String(h || '').trim());
@@ -1733,9 +1736,53 @@
       return { results, excludedCount };
     }
 
+    // ===== 쿠팡 엑셀 주문 변환 =====
+    function convertCoupangOrders(rows) {
+      const results = [];
+      rows.forEach((row) => {
+        const matchKey = String(row['옵션ID'] || '').trim();
+        const product = mapCoupangProduct(matchKey);
+        results.push({
+          seq: results.length + 1,
+          channel: 'coupang',
+          recipientName: row['수취인이름'] || '',
+          productName: product ? product.name : '',
+          productCode: product ? product.code : '',
+          mappingFailed: !product,
+          quantity: Number(row['구매수(수량)']) || 1,
+          phone: String(row['수취인전화번호'] || ''),
+          phone2: '',
+          address: (row['수취인 주소'] || '').trim(),
+          message: row['배송메세지'] || '',
+          productOrderNo: String(row['주문번호'] || ''),
+          amount: Number(row['결제액']) || 0,
+          option: row['등록옵션명'] || row['노출상품명(옵션명)'] || '',
+          orderedAt: row['주문일'] || ''
+        });
+      });
+      return { results, excludedCount: 0 };
+    }
+
+    // ===== 엑셀 파일 채널 감지 =====
+    function detectExcelChannel(rows) {
+      if (rows.length === 0) return 'naver';
+      const keys = Object.keys(rows[0]);
+      if (keys.includes('묶음배송번호') || keys.includes('옵션ID') || keys.includes('수취인이름')) {
+        return 'coupang';
+      }
+      return 'naver';
+    }
+
     // ===== 중복 주문 감지 =====
     function checkDuplicates(orders) {
-      const round = getActiveRound();
+      const data = loadData();
+      let round;
+      if (selectedRoundId === '__general__') {
+        const today = new Date().toISOString().slice(0, 10);
+        round = data.rounds.find(r => r.id === 'general-' + today);
+      } else {
+        round = data.rounds.find(r => r.id === selectedRoundId);
+      }
       if (!round) return [];
       const existing = new Set(round.orders.map(o => o.productOrderNo));
       return orders.filter(o => existing.has(o.productOrderNo));
@@ -1771,6 +1818,24 @@
     }
 
     // ===== 탭1: 업로드 UI 렌더링 =====
+    // ===== 모듈 수준 변수: 선택된 저장 대상 =====
+    let selectedRoundId = '__general__'; // 기본값: 일반 발주
+
+    function buildRoundSelectOptions() {
+      const data = loadData();
+      const rounds = data.rounds || [];
+      let options = '<option value="__general__">일반 발주 (공구 없음)</option>';
+      rounds.forEach(r => {
+        const selected = r.id === selectedRoundId ? ' selected' : '';
+        options += `<option value="${r.id}"${selected}>${escapeHtml(r.name)}</option>`;
+      });
+      return options;
+    }
+
+    function onRoundSelectChange(el) {
+      selectedRoundId = el.value;
+    }
+
     function renderTab1Upload() {
       const tab1 = document.getElementById('tab1');
       if (!tab1) return;
@@ -1779,6 +1844,12 @@
         <div class="card">
           <div class="card-title"><span class="card-icon">📋</span> 주문서 업로드</div>
           <div class="card-desc">네이버 + 쿠팡 주문을 자동으로 가져오거나, 엑셀 파일을 직접 업로드하세요.</div>
+          <div class="form-group" style="margin-bottom:16px;">
+            <label class="form-label">저장 대상</label>
+            <select class="form-input" onchange="onRoundSelectChange(this)">
+              ${buildRoundSelectOptions()}
+            </select>
+          </div>
           <div class="fetch-orders-section">
             <button class="btn btn-primary btn-lg" id="btn-fetch-orders" onclick="handleFetchOrders()">
               주문 가져오기 (네이버 + 쿠팡)
@@ -1794,7 +1865,7 @@
                ondrop="handleTab1Drop(event)">
             <span class="upload-icon">📂</span>
             <p><strong>클릭하여 파일 선택</strong> 또는 여기에 드래그 앤 드롭</p>
-            <p class="upload-hint">.xlsx, .xls 형식 지원 · 스마트스토어 주문 엑셀 전용</p>
+            <p class="upload-hint">.xlsx, .xls 형식 지원 · 네이버/쿠팡 주문 엑셀</p>
           </div>
           <input type="file" id="tab1-file-input" accept=".xlsx,.xls" style="display:none"
                  onchange="handleTab1FileInput(event)" />
@@ -2087,7 +2158,11 @@
             throw e;
           }
         }
-        const { results, excludedCount } = convertOrders(rows);
+        // 채널 자동 감지 (네이버 vs 쿠팡)
+        const channel = detectExcelChannel(rows);
+        const { results, excludedCount } = channel === 'coupang'
+          ? convertCoupangOrders(rows)
+          : convertOrders(rows);
         const dupes = checkDuplicates(results);
 
         convertedOrders = results;
@@ -2095,7 +2170,8 @@
         if (dupes.length > 0) {
           showToast(`중복 주문 ${dupes.length}건이 감지되었습니다. 확인 후 진행하세요.`, 'warning', 5000);
         }
-        showToast(`변환 완료: ${results.length}건 (제외 ${excludedCount}건)`, 'success');
+        const channelLabel = channel === 'coupang' ? '쿠팡' : '네이버';
+        showToast(`[${channelLabel}] 변환 완료: ${results.length}건 (제외 ${excludedCount}건)`, 'success');
         renderTab1Preview(results, excludedCount);
       } catch (err) {
         console.error(err);
@@ -2132,7 +2208,8 @@
 
     // ===== Task 5: 3PL 발주서 엑셀 생성 + 다운로드 (xlsx-populate) =====
     async function downloadOrderExcel(orders) {
-      const today = new Date().toISOString().slice(0, 10);
+      const now = new Date();
+      const today = `${String(now.getFullYear()).slice(2)}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
       const headers = ['보내는분', '보내는분 연락처', '주소', '번호', '수취인명', '상품명', '수량', '핸드폰', '기타연락처', '주소', '배송메세지', '상품주문번호', '상품고유코드', '배송방식', '운송장번호', '택배사'];
       const colWidths = [10, 16, 30, 6, 10, 28, 6, 16, 16, 40, 22, 20, 14, 12, 16, 12];
 
@@ -2208,10 +2285,24 @@
     function saveOrdersToStorage(orders) {
       saveSnapshot(); // undo용 스냅샷
       const data = loadData();
-      const round = data.rounds.find(r => r.id === data.activeRoundId);
-      if (!round) {
-        showToast('활성 공구 라운드가 없습니다.', 'warning');
-        return;
+      let round;
+      if (selectedRoundId === '__general__') {
+        // 일반 발주: 오늘 날짜 라운드 자동 생성 또는 재사용
+        const today = new Date().toISOString().slice(0, 10);
+        const generalId = 'general-' + today;
+        round = data.rounds.find(r => r.id === generalId);
+        if (!round) {
+          round = { id: generalId, name: `일반 발주 (${today})`, startDate: today, endDate: today, influencer: '', orders: [] };
+          data.rounds.push(round);
+        }
+        data.activeRoundId = generalId;
+      } else {
+        round = data.rounds.find(r => r.id === selectedRoundId);
+        if (!round) {
+          showToast('선택한 공구 라운드를 찾을 수 없습니다.', 'warning');
+          return;
+        }
+        data.activeRoundId = selectedRoundId;
       }
       orders.forEach(o => {
         const existing = round.orders.findIndex(e => e.productOrderNo === o.productOrderNo);
@@ -2486,7 +2577,7 @@
               <button class="btn btn-primary" onclick="handleTab2DownloadClick()">
                 ⬇️ 송장 다운로드
               </button>
-              <button class="btn btn-success" onclick="handleTab2SaveClick()">
+              <button class="btn btn-success" onclick="handleTab2SaveClick()" ${getActiveRound() ? '' : 'disabled title="공구 라운드가 없으면 확정 저장할 수 없습니다"'}>
                 💾 확정 저장
               </button>
             </div>
@@ -2912,19 +3003,14 @@
       const tab1  = document.getElementById('tab1');
       const tab2  = document.getElementById('tab2');
 
-      if (!round) {
-        if (tab1) renderNoRoundState(tab1, '발주서 변환');
-        if (tab2) renderNoRoundState(tab2, '송장 변환');
-      } else {
-        // 공구가 있을 때: 탭1 업로드 UI 또는 미리보기
-        // convertedOrders가 있으면 이미 renderTab1Preview()가 호출된 상태이므로 덮어쓰지 않음
-        if (tab1 && !convertedOrders) {
-          renderTab1Upload();
-        }
-        // 탭2: convertedTracking이 있으면 미리보기, 없으면 업로드 UI
-        if (tab2 && !convertedTracking) {
-          renderTab2Upload();
-        }
+      // 탭1: 공구 없어도 업로드 가능 (일반 발주 지원)
+      if (tab1 && !convertedOrders) {
+        renderTab1Upload();
+      }
+
+      // 탭2: 공구 없어도 업로드/변환/다운로드 가능 (확정 저장만 공구 필요)
+      if (tab2 && !convertedTracking) {
+        renderTab2Upload();
       }
 
       // 탭3: 대시보드는 항상 renderDashboard()로 처리 (라운드 없음 상태 포함)
@@ -3029,7 +3115,8 @@
         productCode: o.productCode
       }));
 
-      const today = new Date().toISOString().slice(0, 10);
+      const pNow = new Date();
+      const today = `${String(pNow.getFullYear()).slice(2)}.${String(pNow.getMonth() + 1).padStart(2, '0')}.${String(pNow.getDate()).padStart(2, '0')}`;
       const headers = ['보내는분', '보내는분 연락처', '주소', '번호', '수취인명', '상품명', '수량', '핸드폰', '기타연락처', '주소', '배송메세지', '상품주문번호', '상품고유코드', '배송방식', '운송장번호', '택배사'];
       const colWidths = [10, 16, 30, 6, 10, 28, 6, 16, 16, 40, 22, 20, 14, 12, 16, 12];
 
