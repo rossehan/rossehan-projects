@@ -4,12 +4,12 @@ const NAVER_API_BASE = 'https://api.commerce.naver.com/external/v1';
 
 async function getAccessToken() {
   const clientId = process.env.NAVER_CLIENT_ID;
-  const clientSecret = process.env.NAVER_CLIENT_SECRET;
+  const secretB64 = process.env.NAVER_CLIENT_SECRET_B64;
 
-  if (!clientId || !clientSecret) {
-    throw new Error('NAVER_CLIENT_ID 또는 NAVER_CLIENT_SECRET 환경변수가 설정되지 않았습니다.');
+  if (!clientId || !secretB64) {
+    throw new Error('NAVER_CLIENT_ID 또는 NAVER_CLIENT_SECRET_B64 환경변수가 설정되지 않았습니다.');
   }
-  console.log('[DEBUG] clientId length:', clientId.length, 'clientSecret length:', clientSecret.length, 'clientSecret first3:', clientSecret.slice(0, 3));
+  const clientSecret = Buffer.from(secretB64, 'base64').toString('utf-8');
 
   const timestamp = Date.now();
   const message = `${clientId}_${timestamp}`;
@@ -34,7 +34,7 @@ async function getAccessToken() {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`토큰 발급 실패 (${res.status}): ${text} [DEBUG id_len=${clientId.length} secret_len=${clientSecret.length} secret_first3=${clientSecret.slice(0,3)}]`);
+    throw new Error(`토큰 발급 실패 (${res.status}): ${text}`);
   }
 
   const data = await res.json();
