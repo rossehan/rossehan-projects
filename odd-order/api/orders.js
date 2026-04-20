@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
 
 const NAVER_API_BASE = 'https://api.commerce.naver.com/external/v1';
 
@@ -12,11 +12,9 @@ async function getAccessToken() {
   const clientSecret = Buffer.from(secretB64, 'base64').toString('utf-8');
 
   const timestamp = Date.now();
-  const message = `${clientId}_${timestamp}`;
-  const signature = crypto
-    .createHmac('sha256', clientSecret)
-    .update(message)
-    .digest('base64');
+  const password = `${clientId}_${timestamp}`;
+  const hashed = bcrypt.hashSync(password, clientSecret);
+  const signature = Buffer.from(hashed).toString('base64');
 
   const params = new URLSearchParams({
     client_id: clientId,
