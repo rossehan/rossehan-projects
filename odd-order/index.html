@@ -982,6 +982,23 @@
       color: #dc2626;
     }
 
+    .product-editable {
+      cursor: pointer;
+      border-bottom: 1px dashed #9ca3af;
+      transition: background 0.15s;
+    }
+    .product-editable:hover {
+      background: #fef3c7;
+    }
+    .product-select {
+      font-size: 13px;
+      padding: 4px 6px;
+      border: 1px solid #6366f1;
+      border-radius: 6px;
+      background: #fff;
+      width: 100%;
+      max-width: 220px;
+    }
     .channel-badge {
       display: inline-block;
       font-size: 11px;
@@ -1396,6 +1413,17 @@
 
     // 옵션정보가 없을 때 상품명으로 매핑
     const DEFAULT_PRODUCT = { name: 'ODD. M-01 오드 영양제', code: 'P00300279' };
+
+    // 전체 상품 목록 (드롭다운용)
+    const ALL_PRODUCTS = [
+      { code: 'P00300279', name: 'ODD. M-01 오드 영양제' },
+      { code: 'P00300280', name: '오드 M-01 스타터키트 5일분' },
+      { code: 'P00300281', name: '오드 M-01 리필팩 30일분' },
+      { code: 'P00300282', name: '5일분 3개' },
+      { code: 'P00300283', name: '30일분 1개 + 5일분 2개' },
+      { code: 'P00300284', name: '30일분 2개 + 5일분 3개' },
+      { code: 'P00300285', name: '30일분 3개 + 5일분 4개' },
+    ];
 
     function mapProduct(optionText, productName) {
       const trimmed = (optionText || '').trim();
@@ -1903,8 +1931,8 @@
       results.forEach(o => {
         const failClass = o.mappingFailed ? ' mapping-failed' : '';
         const productCell = o.mappingFailed
-          ? `<span class="mapping-warn-badge">⚠ 매핑 실패</span> <small style="color:#9ca3af;">${escapeHtml(o.option)}</small>`
-          : escapeHtml(o.productName);
+          ? `<span class="product-editable" onclick="openProductSelect(${idx})" title="클릭하여 상품 선택"><span class="mapping-warn-badge">⚠ 매핑 실패</span> <small style="color:#9ca3af;">${escapeHtml(o.option)}</small></span>`
+          : `<span class="product-editable" onclick="openProductSelect(${idx})" title="클릭하여 상품 변경">${escapeHtml(o.productName)}</span>`;
         const channelBadge = o.channel === 'coupang'
           ? '<span class="channel-badge channel-coupang">쿠팡</span>'
           : '<span class="channel-badge channel-naver">네이버</span>';
@@ -2030,6 +2058,40 @@
       convertedOrders = results;
       showToast(`테스트 데이터 ${results.length}건 로드 완료`, 'success');
       renderTab1Preview(results, 0);
+    }
+
+    // ===== 탭1: 상품 변경 (드롭다운) =====
+    function openProductSelect(idx) {
+      if (!convertedOrders || !convertedOrders[idx]) return;
+      const order = convertedOrders[idx];
+      const options = ALL_PRODUCTS.map(p =>
+        `<option value="${p.code}" ${p.code === order.productCode ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
+      ).join('');
+
+      // 해당 행의 상품명 셀 찾기
+      const table = document.querySelector('#tab1 table tbody');
+      if (!table) return;
+      const row = table.rows[idx];
+      if (!row) return;
+      const cell = row.cells[3]; // 채널 열 추가로 상품명은 4번째 (index 3)
+      cell.innerHTML = `<select class="product-select" onchange="changeProduct(${idx}, this.value)" onblur="cancelProductSelect(${idx})" autofocus>${options}</select>`;
+      cell.querySelector('select').focus();
+    }
+
+    function changeProduct(idx, newCode) {
+      if (!convertedOrders || !convertedOrders[idx]) return;
+      const product = ALL_PRODUCTS.find(p => p.code === newCode);
+      if (!product) return;
+      convertedOrders[idx].productName = product.name;
+      convertedOrders[idx].productCode = product.code;
+      convertedOrders[idx].mappingFailed = false;
+      showToast(`#${convertedOrders[idx].seq} 상품 변경: ${product.name}`, 'success', 2000);
+      renderTab1Preview(convertedOrders, 0);
+    }
+
+    function cancelProductSelect(idx) {
+      // blur 시 원래 상품명으로 복원
+      setTimeout(() => renderTab1Preview(convertedOrders, 0), 150);
     }
 
     // ===== 탭1: 네이버 + 쿠팡 API 병렬 주문 가져오기 =====
