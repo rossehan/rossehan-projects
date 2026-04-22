@@ -130,21 +130,38 @@ export default async function handler(req, res) {
 
     for (const order of orders) {
       try {
-        console.log(`[coupang-invoice] orderId=${order.orderId} 조회 시작`);
-        const sheetInfos = await getOrderSheetInfo(order.orderId, creds);
-        console.log(`[coupang-invoice] orderId=${order.orderId} 조회 성공:`, JSON.stringify(sheetInfos));
-        for (const info of sheetInfos) {
-          allShipmentBoxIds.add(info.shipmentBoxId);
+        // shipmentBoxId가 이미 있으면 (쿠팡 DeliveryList) ordersheets 조회 건너뛰기
+        if (order.shipmentBoxId && order.vendorItemId) {
+          console.log(`[coupang-invoice] 직접 등록: orderId=${order.orderId}, shipmentBoxId=${order.shipmentBoxId}`);
+          allShipmentBoxIds.add(order.shipmentBoxId);
           invoiceDtos.push({
-            shipmentBoxId: Number(info.shipmentBoxId),
-            orderId: Number(info.orderId),
-            vendorItemId: Number(info.vendorItemId),
+            shipmentBoxId: Number(order.shipmentBoxId),
+            orderId: Number(order.orderId),
+            vendorItemId: Number(order.vendorItemId),
             deliveryCompanyCode: deliveryCompanyCode || 'CJGLS',
             invoiceNumber: order.trackingNumber,
             splitShipping: false,
             preSplitShipped: false,
             estimatedShippingDate: '',
           });
+        } else {
+          // ordersheets 조회 필요 (앱 자체 발주서 형식)
+          console.log(`[coupang-invoice] orderId=${order.orderId} 조회 시작`);
+          const sheetInfos = await getOrderSheetInfo(order.orderId, creds);
+          console.log(`[coupang-invoice] orderId=${order.orderId} 조회 성공:`, JSON.stringify(sheetInfos));
+          for (const info of sheetInfos) {
+            allShipmentBoxIds.add(info.shipmentBoxId);
+            invoiceDtos.push({
+              shipmentBoxId: Number(info.shipmentBoxId),
+              orderId: Number(info.orderId),
+              vendorItemId: Number(info.vendorItemId),
+              deliveryCompanyCode: deliveryCompanyCode || 'CJGLS',
+              invoiceNumber: order.trackingNumber,
+              splitShipping: false,
+              preSplitShipped: false,
+              estimatedShippingDate: '',
+            });
+          }
         }
       } catch (err) {
         errors.push({ orderId: order.orderId, error: err.message });

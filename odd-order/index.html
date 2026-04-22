@@ -2532,13 +2532,15 @@
           // 헤더 행에서 열 위치 자동 감지
           const headerRow = rows[0] || [];
           let colOrder = -1, colTracking = -1, colChannel = -1;
+          let colShipmentBox = -1, colVendorItem = -1;
           let isCoupangFormat = false;
           headerRow.forEach((h, idx) => {
             const val = String(h).trim();
             if (val === '상품주문번호' || val === '주문번호') colOrder = idx;
             if (val === '운송장번호' || val === '송장번호') colTracking = idx;
             if (val === '채널') colChannel = idx;
-            if (val === '묶음배송번호') isCoupangFormat = true;
+            if (val === '묶음배송번호') { isCoupangFormat = true; colShipmentBox = idx; }
+            if (val === '옵션ID') colVendorItem = idx;
           });
 
           // 헤더 감지 실패 시 기존 고정 위치 사용
@@ -2560,7 +2562,10 @@
               : defaultChannel;
             if (!productOrderNo) { skippedNoOrderNo++; continue; }
             if (!trackingNo) { skippedNoTracking++; continue; }
-            results.push({ productOrderNo, trackingNo, channel });
+            const entry = { productOrderNo, trackingNo, channel };
+            if (colShipmentBox >= 0) entry.shipmentBoxId = String(row[colShipmentBox] || '').trim();
+            if (colVendorItem >= 0) entry.vendorItemId = String(row[colVendorItem] || '').trim();
+            results.push(entry);
           }
           resolve({ results, skippedNoOrderNo, skippedNoTracking });
         };
@@ -2937,6 +2942,8 @@
               orders: coupangOrders.map(o => ({
                 orderId: o.productOrderNo,
                 trackingNumber: o.trackingNo,
+                shipmentBoxId: o.shipmentBoxId || '',
+                vendorItemId: o.vendorItemId || '',
               })),
               deliveryCompanyCode: courierCode,
             }),
