@@ -2532,26 +2532,32 @@
           // 헤더 행에서 열 위치 자동 감지
           const headerRow = rows[0] || [];
           let colOrder = -1, colTracking = -1, colChannel = -1;
+          let isCoupangFormat = false;
           headerRow.forEach((h, idx) => {
             const val = String(h).trim();
             if (val === '상품주문번호' || val === '주문번호') colOrder = idx;
             if (val === '운송장번호' || val === '송장번호') colTracking = idx;
             if (val === '채널') colChannel = idx;
+            if (val === '묶음배송번호') isCoupangFormat = true;
           });
 
           // 헤더 감지 실패 시 기존 고정 위치 사용
           if (colOrder === -1) colOrder = 11;
           if (colTracking === -1) colTracking = 14;
-          if (colChannel === -1) colChannel = 16;
 
-          console.log('[parseTracking] 감지된 열:', { colOrder, colTracking, colChannel });
+          // 쿠팡 DeliveryList 형식이면 채널 자동 설정
+          const defaultChannel = isCoupangFormat ? 'coupang' : 'naver';
+
+          console.log('[parseTracking] 감지된 열:', { colOrder, colTracking, colChannel, isCoupangFormat });
 
           for (let i = 1; i < rows.length; i++) {
             const row = rows[i];
             if (!row || row.length === 0) continue;
             const productOrderNo = String(row[colOrder] || '').trim();
             const trackingNo = String(row[colTracking] || '').trim();
-            const channel = String(row[colChannel] || 'naver').trim().toLowerCase();
+            const channel = colChannel >= 0
+              ? String(row[colChannel] || defaultChannel).trim().toLowerCase()
+              : defaultChannel;
             if (!productOrderNo) { skippedNoOrderNo++; continue; }
             if (!trackingNo) { skippedNoTracking++; continue; }
             results.push({ productOrderNo, trackingNo, channel });
